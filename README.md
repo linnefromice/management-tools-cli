@@ -30,6 +30,10 @@ Use the `linear` subcommands to inspect or cache master data locally:
 ```bash
 bun run index.ts linear projects --full
 bun run index.ts linear teams --full
+bun run index.ts linear issues
+bun run index.ts linear users
+bun run index.ts linear labels
+bun run index.ts linear cycles
 bun run index.ts linear sync
 ```
 

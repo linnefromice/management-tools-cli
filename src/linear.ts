@@ -254,3 +254,11 @@ export const fetchWorkspaceTeams = async (
 
   return results;
 };
+
+export const fetchWorkspaceIssues = async (): Promise<LinearIssueFull[]> => fetchIssuesPlain();
+
+export const fetchWorkspaceUsers = async (): Promise<LinearUserFull[]> => fetchUsersPlain();
+
+export const fetchWorkspaceLabels = async (): Promise<LinearLabelFull[]> => fetchLabelsPlain();
+
+export const fetchWorkspaceCycles = async (): Promise<LinearCycleFull[]> => fetchCyclesPlain();

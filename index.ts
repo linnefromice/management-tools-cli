@@ -3,6 +3,10 @@ import {
   LINEAR_WORKSPACE_ID,
   fetchWorkspaceProjects,
   fetchWorkspaceTeams,
+  fetchWorkspaceIssues,
+  fetchWorkspaceUsers,
+  fetchWorkspaceLabels,
+  fetchWorkspaceCycles,
   fetchLinearMasterData,
 } from "./src/linear";
 import { writeLinearDataset } from "./src/storage";
@@ -14,11 +18,19 @@ const usage = `Usage:
   bun run index.ts greet --hour <HH> --name <YourName>
   bun run index.ts linear projects [--full]
   bun run index.ts linear teams [--full]
+  bun run index.ts linear issues
+  bun run index.ts linear users
+  bun run index.ts linear labels
+  bun run index.ts linear cycles
   bun run index.ts linear sync`;
 
 const linearUsage = `Linear commands:
   bun run index.ts linear projects [--full]
   bun run index.ts linear teams [--full]
+  bun run index.ts linear issues
+  bun run index.ts linear users
+  bun run index.ts linear labels
+  bun run index.ts linear cycles
   bun run index.ts linear sync`;
 
 const printHelp = () => {
@@ -73,6 +85,42 @@ const runLinearTeams = async (wantsFull: boolean) => {
   };
 };
 
+const runLinearIssues = async () => {
+  const issues = await fetchWorkspaceIssues();
+  return {
+    workspaceId: LINEAR_WORKSPACE_ID,
+    count: issues.length,
+    issues,
+  };
+};
+
+const runLinearUsers = async () => {
+  const users = await fetchWorkspaceUsers();
+  return {
+    workspaceId: LINEAR_WORKSPACE_ID,
+    count: users.length,
+    users,
+  };
+};
+
+const runLinearLabels = async () => {
+  const labels = await fetchWorkspaceLabels();
+  return {
+    workspaceId: LINEAR_WORKSPACE_ID,
+    count: labels.length,
+    labels,
+  };
+};
+
+const runLinearCycles = async () => {
+  const cycles = await fetchWorkspaceCycles();
+  return {
+    workspaceId: LINEAR_WORKSPACE_ID,
+    count: cycles.length,
+    cycles,
+  };
+};
+
 const runLinearSync = async () => {
   const masterData = await fetchLinearMasterData();
   const datasets = {
@@ -122,6 +170,18 @@ const runLinear = async (args: string[]) => {
         break;
       case "teams":
         payload = await runLinearTeams(wantsFull);
+        break;
+      case "issues":
+        payload = await runLinearIssues();
+        break;
+      case "users":
+        payload = await runLinearUsers();
+        break;
+      case "labels":
+        payload = await runLinearLabels();
+        break;
+      case "cycles":
+        payload = await runLinearCycles();
         break;
       case "sync":
         payload = await runLinearSync();
