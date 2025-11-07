@@ -3,7 +3,9 @@ import {
   LINEAR_WORKSPACE_ID,
   fetchWorkspaceProjects,
   fetchWorkspaceTeams,
+  fetchLinearMasterData,
 } from "./src/linear";
+import { writeLinearDataset } from "./src/storage";
 
 const [, , command, ...rawArgs] = process.argv;
 
@@ -11,11 +13,13 @@ const usage = `Usage:
   bun run index.ts help
   bun run index.ts greet --hour <HH> --name <YourName>
   bun run index.ts linear projects [--full]
-  bun run index.ts linear teams [--full]`;
+  bun run index.ts linear teams [--full]
+  bun run index.ts linear sync`;
 
 const linearUsage = `Linear commands:
   bun run index.ts linear projects [--full]
-  bun run index.ts linear teams [--full]`;
+  bun run index.ts linear teams [--full]
+  bun run index.ts linear sync`;
 
 const printHelp = () => {
   console.log(usage);
@@ -69,6 +73,35 @@ const runLinearTeams = async (wantsFull: boolean) => {
   };
 };
 
+const runLinearSync = async () => {
+  const masterData = await fetchLinearMasterData();
+  const datasets = {
+    teams: masterData.teams,
+    projects: masterData.projects,
+    issues: masterData.issues,
+    users: masterData.users,
+    labels: masterData.labels,
+    cycles: masterData.cycles,
+  };
+
+  const files = await Promise.all(
+    Object.entries(datasets).map(async ([name, items]) => {
+      const storedAt = await writeLinearDataset(name, {
+        fetchedAt: masterData.fetchedAt,
+        count: items.length,
+        items,
+      });
+      return { name, filePath: storedAt, count: items.length };
+    }),
+  );
+
+  return {
+    workspaceId: LINEAR_WORKSPACE_ID,
+    fetchedAt: masterData.fetchedAt,
+    files,
+  };
+};
+
 const runLinear = async (args: string[]) => {
   const [subCommand, ...linearArgs] = args;
 
@@ -89,6 +122,9 @@ const runLinear = async (args: string[]) => {
         break;
       case "teams":
         payload = await runLinearTeams(wantsFull);
+        break;
+      case "sync":
+        payload = await runLinearSync();
         break;
       default:
         console.error(`Unknown linear subcommand: ${subCommand}`);

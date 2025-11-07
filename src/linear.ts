@@ -23,10 +23,15 @@ const getLinearClient = () => {
 
 const getWorkspaceId = () => requireEnv("LINEAR_WORKSPACE_ID");
 
+let validatedWorkspaceId: string | null = null;
+
 const ensureWorkspaceAccess = async () => {
   const linear = getLinearClient();
-  const expectedWorkspace = getWorkspaceId();
+  if (validatedWorkspaceId) {
+    return { linear, organizationId: validatedWorkspaceId };
+  }
 
+  const expectedWorkspace = getWorkspaceId();
   const viewer = await linear.viewer;
   const organization = await viewer.organization;
   const organizationId = organization.id;
@@ -37,6 +42,7 @@ const ensureWorkspaceAccess = async () => {
     );
   }
 
+  validatedWorkspaceId = organizationId;
   return { linear, organizationId };
 };
 
@@ -55,6 +61,21 @@ export type LinearProjectFull = Record<string, unknown>;
 
 export type FetchWorkspaceProjectsOptions = {
   full?: boolean;
+};
+
+export type LinearIssueFull = Record<string, unknown>;
+export type LinearUserFull = Record<string, unknown>;
+export type LinearLabelFull = Record<string, unknown>;
+export type LinearCycleFull = Record<string, unknown>;
+
+export type LinearMasterData = {
+  fetchedAt: string;
+  teams: LinearTeamFull[];
+  projects: LinearProjectFull[];
+  issues: LinearIssueFull[];
+  users: LinearUserFull[];
+  labels: LinearLabelFull[];
+  cycles: LinearCycleFull[];
 };
 
 export type LinearTeamSummary = {
@@ -95,6 +116,30 @@ const summarizeTeam = (team: Team): LinearTeamSummary => ({
 
 const teamToPlainObject = (team: Team): LinearTeamFull => JSON.parse(JSON.stringify(team));
 
+const entityToPlainObject = <T>(entity: T): Record<string, unknown> =>
+  JSON.parse(JSON.stringify(entity));
+
+const paginateConnection = async <T>(
+  fetchPage: (cursor?: string | null) => Promise<{
+    nodes: T[];
+    pageInfo: { hasNextPage: boolean; endCursor?: string | null };
+  }>,
+): Promise<T[]> => {
+  const items: T[] = [];
+  let cursor: string | null | undefined = null;
+
+  do {
+    const connection = await fetchPage(cursor);
+    items.push(...connection.nodes);
+    cursor =
+      connection.pageInfo.hasNextPage && connection.pageInfo.endCursor
+        ? connection.pageInfo.endCursor
+        : null;
+  } while (cursor);
+
+  return items;
+};
+
 export const fetchWorkspaceProjects = async (
   options: FetchWorkspaceProjectsOptions = {},
 ): Promise<LinearProjectSummary[] | LinearProjectFull[]> => {
@@ -124,6 +169,59 @@ export const fetchWorkspaceProjects = async (
   } while (cursor);
 
   return results;
+};
+
+const fetchIssuesPlain = async (): Promise<LinearIssueFull[]> => {
+  const { linear } = await ensureWorkspaceAccess();
+  const nodes = await paginateConnection((cursor) =>
+    linear.issues({ first: PAGE_SIZE, after: cursor ?? undefined, includeArchived: false }),
+  );
+  return nodes.map(entityToPlainObject);
+};
+
+const fetchUsersPlain = async (): Promise<LinearUserFull[]> => {
+  const { linear } = await ensureWorkspaceAccess();
+  const nodes = await paginateConnection((cursor) =>
+    linear.users({ first: PAGE_SIZE, after: cursor ?? undefined }),
+  );
+  return nodes.map(entityToPlainObject);
+};
+
+const fetchLabelsPlain = async (): Promise<LinearLabelFull[]> => {
+  const { linear } = await ensureWorkspaceAccess();
+  const nodes = await paginateConnection((cursor) =>
+    linear.issueLabels({ first: PAGE_SIZE, after: cursor ?? undefined, includeArchived: false }),
+  );
+  return nodes.map(entityToPlainObject);
+};
+
+const fetchCyclesPlain = async (): Promise<LinearCycleFull[]> => {
+  const { linear } = await ensureWorkspaceAccess();
+  const nodes = await paginateConnection((cursor) =>
+    linear.cycles({ first: PAGE_SIZE, after: cursor ?? undefined }),
+  );
+  return nodes.map(entityToPlainObject);
+};
+
+export const fetchLinearMasterData = async (): Promise<LinearMasterData> => {
+  const [teams, projects, issues, users, labels, cycles] = await Promise.all([
+    fetchWorkspaceTeams({ full: true }) as Promise<LinearTeamFull[]>,
+    fetchWorkspaceProjects({ full: true }) as Promise<LinearProjectFull[]>,
+    fetchIssuesPlain(),
+    fetchUsersPlain(),
+    fetchLabelsPlain(),
+    fetchCyclesPlain(),
+  ]);
+
+  return {
+    fetchedAt: new Date().toISOString(),
+    teams,
+    projects,
+    issues,
+    users,
+    labels,
+    cycles,
+  };
 };
 
 export const fetchWorkspaceTeams = async (
