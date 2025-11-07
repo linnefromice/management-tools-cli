@@ -10,11 +10,19 @@ const [, , command, ...rawArgs] = process.argv;
 const usage = `Usage:
   bun run index.ts help
   bun run index.ts greet --hour <HH> --name <YourName>
-  bun run index.ts linear-projects [--full]
-  bun run index.ts linear-teams [--full]`;
+  bun run index.ts linear projects [--full]
+  bun run index.ts linear teams [--full]`;
+
+const linearUsage = `Linear commands:
+  bun run index.ts linear projects [--full]
+  bun run index.ts linear teams [--full]`;
 
 const printHelp = () => {
   console.log(usage);
+};
+
+const printLinearHelp = () => {
+  console.log(linearUsage);
 };
 
 const exitWithUsage = (message?: string) => {
@@ -39,43 +47,58 @@ const runGreet = () => {
   }
 };
 
-const runLinearProjects = async () => {
-  try {
-    const wantsFull = rawArgs.includes("--full");
-    const projects = await fetchWorkspaceProjects({ full: wantsFull });
+const runLinearProjects = async (wantsFull: boolean) => {
+  const projects = await fetchWorkspaceProjects({ full: wantsFull });
 
-    const payload = {
-      workspaceId: LINEAR_WORKSPACE_ID,
-      full: wantsFull,
-      count: projects.length,
-      projects,
-    };
-
-    console.log(JSON.stringify(payload, null, 2));
-  } catch (error) {
-    console.error("Failed to fetch Linear projects.");
-    if (error instanceof Error) {
-      console.error(error.message);
-    }
-    process.exit(1);
-  }
+  return {
+    workspaceId: LINEAR_WORKSPACE_ID,
+    full: wantsFull,
+    count: projects.length,
+    projects,
+  };
 };
 
-const runLinearTeams = async () => {
-  try {
-    const wantsFull = rawArgs.includes("--full");
-    const teams = await fetchWorkspaceTeams({ full: wantsFull });
+const runLinearTeams = async (wantsFull: boolean) => {
+  const teams = await fetchWorkspaceTeams({ full: wantsFull });
 
-    const payload = {
-      workspaceId: LINEAR_WORKSPACE_ID,
-      full: wantsFull,
-      count: teams.length,
-      teams,
-    };
+  return {
+    workspaceId: LINEAR_WORKSPACE_ID,
+    full: wantsFull,
+    count: teams.length,
+    teams,
+  };
+};
+
+const runLinear = async (args: string[]) => {
+  const [subCommand, ...linearArgs] = args;
+
+  if (!subCommand || subCommand === "help") {
+    printLinearHelp();
+    if (!subCommand) process.exit(1);
+    return;
+  }
+
+  const wantsFull = linearArgs.includes("--full");
+
+  try {
+    let payload: Record<string, unknown>;
+
+    switch (subCommand) {
+      case "projects":
+        payload = await runLinearProjects(wantsFull);
+        break;
+      case "teams":
+        payload = await runLinearTeams(wantsFull);
+        break;
+      default:
+        console.error(`Unknown linear subcommand: ${subCommand}`);
+        printLinearHelp();
+        process.exit(1);
+    }
 
     console.log(JSON.stringify(payload, null, 2));
   } catch (error) {
-    console.error("Failed to fetch Linear teams.");
+    console.error("Failed to execute linear command.");
     if (error instanceof Error) {
       console.error(error.message);
     }
@@ -90,11 +113,8 @@ switch (command) {
   case "help":
     printHelp();
     break;
-  case "linear-projects":
-    void runLinearProjects();
-    break;
-  case "linear-teams":
-    void runLinearTeams();
+  case "linear":
+    void runLinear(rawArgs);
     break;
   default:
     exitWithUsage(`Unknown command: ${command}`);
