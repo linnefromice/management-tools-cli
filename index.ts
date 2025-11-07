@@ -8,13 +8,18 @@ import {
 const [, , command, ...rawArgs] = process.argv;
 
 const usage = `Usage:
+  bun run index.ts help
   bun run index.ts greet --hour <HH> --name <YourName>
   bun run index.ts linear-projects [--full]
   bun run index.ts linear-teams [--full]`;
 
+const printHelp = () => {
+  console.log(usage);
+};
+
 const exitWithUsage = (message?: string) => {
   if (message) console.error(message);
-  console.log(usage);
+  printHelp();
   process.exit(1);
 };
 
@@ -81,6 +86,9 @@ const runLinearTeams = async () => {
 switch (command) {
   case "greet":
     runGreet();
+    break;
+  case "help":
+    printHelp();
     break;
   case "linear-projects":
     void runLinearProjects();
