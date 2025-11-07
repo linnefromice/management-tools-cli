@@ -1,11 +1,16 @@
 import { CliUsageError, resolveGreetingFromArgs } from "./src/greet";
-import { LINEAR_WORKSPACE_ID, fetchWorkspaceProjects } from "./src/linear";
+import {
+  LINEAR_WORKSPACE_ID,
+  fetchWorkspaceProjects,
+  fetchWorkspaceTeams,
+} from "./src/linear";
 
 const [, , command, ...rawArgs] = process.argv;
 
 const usage = `Usage:
   bun run index.ts greet --hour <HH> --name <YourName>
-  bun run index.ts linear-projects [--full]`;
+  bun run index.ts linear-projects [--full]
+  bun run index.ts linear-teams [--full]`;
 
 const exitWithUsage = (message?: string) => {
   if (message) console.error(message);
@@ -51,12 +56,37 @@ const runLinearProjects = async () => {
   }
 };
 
+const runLinearTeams = async () => {
+  try {
+    const wantsFull = rawArgs.includes("--full");
+    const teams = await fetchWorkspaceTeams({ full: wantsFull });
+
+    const payload = {
+      workspaceId: LINEAR_WORKSPACE_ID,
+      full: wantsFull,
+      count: teams.length,
+      teams,
+    };
+
+    console.log(JSON.stringify(payload, null, 2));
+  } catch (error) {
+    console.error("Failed to fetch Linear teams.");
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+    process.exit(1);
+  }
+};
+
 switch (command) {
   case "greet":
     runGreet();
     break;
   case "linear-projects":
     void runLinearProjects();
+    break;
+  case "linear-teams":
+    void runLinearTeams();
     break;
   default:
     exitWithUsage(`Unknown command: ${command}`);
