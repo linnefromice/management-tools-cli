@@ -14,12 +14,12 @@ const parseArgs = (args: string[]): ParsedArgs => {
 
   for (let i = 0; i < args.length; i += 1) {
     const token = args[i];
-    if (!token.startsWith("--")) continue;
+    if (typeof token !== "string" || !token.startsWith("--")) continue;
 
-    const [flag, inlineValue] = token.split("=", 2);
+    const [flag = "", inlineValue] = token.split("=", 2);
     const key = flag.slice(2);
 
-    if (!key) continue;
+    if (!flag || !key) continue;
 
     if (inlineValue !== undefined) {
       result[key] = inlineValue;
