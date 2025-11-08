@@ -202,9 +202,22 @@ const runLinearIssueByKey = async (issueKey: string) => {
   };
 };
 
-const runLinearSync = async () => {
+const runLinearSync = async (dataTypes?: string[]) => {
+  // Define valid data types
+  const validTypes = ["teams", "projects", "issues", "users", "labels", "cycles"];
+
+  // Validate that all requested data types are valid before fetching data
+  if (dataTypes && dataTypes.length > 0) {
+    const invalidTypes = dataTypes.filter(type => !validTypes.includes(type));
+    if (invalidTypes.length > 0) {
+      throw new Error(
+        `Invalid data type(s): ${invalidTypes.join(", ")}. Valid types are: ${validTypes.join(", ")}`
+      );
+    }
+  }
+
   const masterData = await fetchLinearMasterData();
-  const datasets = {
+  const allDatasets = {
     teams: masterData.teams,
     projects: masterData.projects,
     issues: masterData.issues,
@@ -212,6 +225,13 @@ const runLinearSync = async () => {
     labels: masterData.labels,
     cycles: masterData.cycles,
   };
+
+  // Filter datasets based on dataTypes parameter
+  const datasets = dataTypes && dataTypes.length > 0
+    ? Object.fromEntries(
+        Object.entries(allDatasets).filter(([name]) => dataTypes.includes(name))
+      )
+    : allDatasets;
 
   const files = await Promise.all(
     Object.entries(datasets).map(async ([name, items]) => {
@@ -228,6 +248,7 @@ const runLinearSync = async () => {
     workspaceId: LINEAR_WORKSPACE_ID,
     fetchedAt: masterData.fetchedAt,
     files,
+    ...(dataTypes && dataTypes.length > 0 ? { syncedTypes: dataTypes } : {}),
   };
 };
 
@@ -304,9 +325,13 @@ const runLinear = async (args: string[]) => {
         payload = await runLinearIssuesLocal(linearArgs);
         collectionKey = "issues";
         break;
-      case "sync":
-        payload = await runLinearSync();
+      case "sync": {
+        // Parse comma-separated data types from positional args
+        const dataTypesArg = positionalArgs[0];
+        const dataTypes = dataTypesArg ? dataTypesArg.split(",").map(t => t.trim()) : undefined;
+        payload = await runLinearSync(dataTypes);
         break;
+      }
       default:
         console.error(`Unknown linear subcommand: ${subCommand}`);
         printLinearHelp();

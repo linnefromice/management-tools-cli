@@ -9,7 +9,10 @@ export const getUsageText = () => `Usage:
   bun run index.ts linear labels [--format csv] [--remote]
   bun run index.ts linear cycles [--format csv] [--remote]
   bun run index.ts linear search-issues [--project <ID>] [--label <ID>] [--cycle <ID>] [--format csv]
-  bun run index.ts linear sync`;
+  bun run index.ts linear sync [data-types]
+    - Sync all data or specific data types (comma-separated)
+    - Valid data types: teams, projects, issues, users, labels, cycles
+    - Example: bun run index.ts linear sync issues,users`;
 
 export const getLinearUsageText = () => `Linear commands:
   bun run index.ts linear projects [--full] [--format csv] [--remote]
@@ -20,4 +23,7 @@ export const getLinearUsageText = () => `Linear commands:
   bun run index.ts linear labels [--format csv] [--remote]
   bun run index.ts linear cycles [--format csv] [--remote]
   bun run index.ts linear search-issues [--project <ID>] [--label <ID>] [--cycle <ID>] [--format csv]
-  bun run index.ts linear sync`;
+  bun run index.ts linear sync [data-types]
+    - Sync all data or specific data types (comma-separated)
+    - Valid data types: teams, projects, issues, users, labels, cycles
+    - Example: bun run index.ts linear sync issues,users`;
