@@ -42,6 +42,22 @@ export type IssueSearchFilters = {
   cycleId?: string;
 };
 
+type StoredIssueRecord = LinearIssueFull & {
+  projectId?: string;
+  cycleId?: string;
+  labelIds?: string[];
+  _project?: { id?: string };
+  _cycle?: { id?: string };
+};
+
+const resolveProjectId = (issue: StoredIssueRecord) =>
+  issue.projectId ?? issue._project?.id ?? undefined;
+
+const resolveCycleId = (issue: StoredIssueRecord) =>
+  issue.cycleId ?? issue._cycle?.id ?? undefined;
+
+const resolveLabelIds = (issue: StoredIssueRecord) => issue.labelIds ?? [];
+
 const parseIssueKey = (issueKey: string) => {
   const [teamKey, numberPart] = issueKey.split("-");
   const issueNumber = Number(numberPart);
@@ -70,10 +86,11 @@ export const searchStoredIssues = async (filters: IssueSearchFilters) => {
   const dataset = await readLinearDataset<LinearIssueFull>("issues");
 
   const filtered = dataset.items.filter((issue) => {
-    const matchesProject = !filters.projectId || issue.projectId === filters.projectId;
-    const labelIds = (issue as { labelIds?: string[] }).labelIds ?? [];
+    const record = issue as StoredIssueRecord;
+    const matchesProject = !filters.projectId || resolveProjectId(record) === filters.projectId;
+    const labelIds = resolveLabelIds(record);
     const matchesLabel = !filters.labelId || labelIds.includes(filters.labelId);
-    const matchesCycle = !filters.cycleId || issue.cycleId === filters.cycleId;
+    const matchesCycle = !filters.cycleId || resolveCycleId(record) === filters.cycleId;
     return matchesProject && matchesLabel && matchesCycle;
   });
 

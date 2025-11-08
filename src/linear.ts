@@ -1,3 +1,4 @@
+import type { Issue } from "@linear/sdk";
 import { LinearClient, Project, Team } from "@linear/sdk";
 
 const PAGE_SIZE = 50;
@@ -124,6 +125,49 @@ const teamToPlainObject = (team: Team): LinearTeamFull => JSON.parse(JSON.string
 const entityToPlainObject = <T>(entity: T): Record<string, unknown> =>
   JSON.parse(JSON.stringify(entity));
 
+type IssueLikeRecord = LinearIssueFull & {
+  projectId?: string | null;
+  cycleId?: string | null;
+  teamId?: string | null;
+  stateId?: string | null;
+  assigneeId?: string | null;
+  labelIds?: string[];
+  _project?: { id?: string | null };
+  _cycle?: { id?: string | null };
+  _team?: { id?: string | null };
+  _state?: { id?: string | null };
+  _assignee?: { id?: string | null };
+};
+
+const normalizeIssueRecord = (issue: Issue | LinearIssueFull): LinearIssueFull => {
+  const plain = entityToPlainObject(issue) as IssueLikeRecord;
+  const source = issue as IssueLikeRecord;
+
+  const ensureId = (
+    current: string | null | undefined,
+    fallbackGetter: () => string | null | undefined,
+  ) => current ?? fallbackGetter() ?? undefined;
+
+  plain.projectId = ensureId(plain.projectId, () => source.projectId ?? plain._project?.id);
+  plain.cycleId = ensureId(plain.cycleId, () => source.cycleId ?? plain._cycle?.id);
+  plain.teamId = ensureId(plain.teamId, () => source.teamId ?? plain._team?.id);
+  plain.stateId = ensureId(plain.stateId, () => source.stateId ?? plain._state?.id);
+  plain.assigneeId = ensureId(
+    plain.assigneeId,
+    () => source.assigneeId ?? plain._assignee?.id,
+  );
+
+  if (!Array.isArray(plain.labelIds) && Array.isArray(source.labelIds)) {
+    plain.labelIds = source.labelIds;
+  }
+
+  if (!plain.labelIds) {
+    plain.labelIds = [];
+  }
+
+  return plain;
+};
+
 const paginateConnection = async <T>(
   fetchPage: (cursor?: string | null) => Promise<{
     nodes: T[];
@@ -181,7 +225,7 @@ const fetchIssuesPlain = async (): Promise<LinearIssueFull[]> => {
   const nodes = await paginateConnection((cursor) =>
     linear.issues({ first: PAGE_SIZE, after: cursor ?? undefined, includeArchived: false }),
   );
-  return nodes.map(entityToPlainObject);
+  return nodes.map(normalizeIssueRecord);
 };
 
 const fetchUsersPlain = async (): Promise<LinearUserFull[]> => {

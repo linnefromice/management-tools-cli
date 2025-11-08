@@ -75,6 +75,29 @@ describe("searchStoredIssues", () => {
     expect(result.count).toBe(1);
     expect(result.issues[0]?.id).toBe("issue-2");
   });
+
+  test("falls back to nested relation ids when normalized fields are missing", async () => {
+    await writeLinearDataset("issues", {
+      fetchedAt: new Date().toISOString(),
+      count: 1,
+      items: [
+        {
+          id: "issue-nested",
+          labelIds: [],
+          _project: { id: "project-nested" },
+          _cycle: { id: "cycle-nested" },
+        } as LinearIssueFull,
+      ],
+    });
+
+    const result = await searchStoredIssues({
+      projectId: "project-nested",
+      cycleId: "cycle-nested",
+    });
+
+    expect(result.count).toBe(1);
+    expect(result.issues[0]?.id).toBe("issue-nested");
+  });
 });
 
 describe("findStoredIssueByKey", () => {
