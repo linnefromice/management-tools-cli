@@ -4,12 +4,12 @@ import { getUsageText, getLinearUsageText } from "../src/help";
 describe("getUsageText", () => {
   test("lists greet command", () => {
     const usage = getUsageText();
-    expect(usage).toContain("bun run index.ts greet --hour <HH> --name <YourName>");
+    expect(usage).toContain("cli-name greet --hour <HH> --name <YourName>");
   });
 
   test("lists linear sync command", () => {
     const usage = getUsageText();
-    expect(usage).toContain("bun run index.ts linear sync");
+    expect(usage).toContain("cli-name linear sync");
   });
 
   test("mentions format flag", () => {
@@ -31,7 +31,7 @@ describe("getUsageText", () => {
 describe("getLinearUsageText", () => {
   test("includes projects subcommand", () => {
     const usage = getLinearUsageText();
-    expect(usage).toContain("bun run index.ts linear projects [--full] [--format csv] [--remote]");
+    expect(usage).toContain("cli-name linear projects [--full] [--format csv] [--remote]");
   });
 
   test("includes search-issues filters", () => {

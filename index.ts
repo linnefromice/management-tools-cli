@@ -26,6 +26,7 @@ import {
 } from "./src/storage";
 import { getUsageText, getLinearUsageText } from "./src/help";
 import { normalizeFormat, printPayload, writePayload } from "./src/output";
+import { logger } from "./src/logger";
 
 const [, , command, ...rawArgs] = process.argv;
 
@@ -118,7 +119,7 @@ const readDatasetOrThrow = async <T>(name: string) => {
     return await readLinearDataset<T>(name);
   } catch {
     throw new Error(
-      `Local dataset "${name}" not found. Run "bun run index.ts linear sync --remote" or re-run this command with --remote.`,
+      `Local dataset "${name}" not found. Run "cli-name linear sync --remote" or re-run this command with --remote.`,
     );
   }
 };
@@ -143,9 +144,10 @@ const runLinearProjects = async (wantsFull: boolean, remote: boolean) => {
   const dataset = await getDataset<LinearProjectSummary | LinearProjectFull>(
     "projects",
     remote,
-    () => fetchWorkspaceProjects({ full: wantsFull }) as Promise<
-      Array<LinearProjectSummary | LinearProjectFull>
-    >,
+    () =>
+      fetchWorkspaceProjects({ full: wantsFull }) as Promise<
+        Array<LinearProjectSummary | LinearProjectFull>
+      >,
   );
 
   return {
@@ -234,22 +236,12 @@ const runLinearIssueByKey = async (issueKey: string) => {
   };
 };
 
-const runLinearSync = async (dataTypes?: string[]) => {
-  // Define valid data types
-  const validTypes = ["teams", "projects", "issues", "users", "labels", "cycles"];
-
-  // Validate that all requested data types are valid before fetching data
-  if (dataTypes && dataTypes.length > 0) {
-    const invalidTypes = dataTypes.filter(type => !validTypes.includes(type));
-    if (invalidTypes.length > 0) {
-      throw new Error(
-        `Invalid data type(s): ${invalidTypes.join(", ")}. Valid types are: ${validTypes.join(", ")}`
-      );
-    }
-  }
-
+const runLinearSync = async () => {
+  logger.info("Fetching latest data from Linear...");
   const masterData = await fetchLinearMasterData();
-  const allDatasets = {
+  logger.info("Fetched datasets. Writing to storage...");
+
+  const datasets = {
     teams: masterData.teams,
     projects: masterData.projects,
     issues: masterData.issues,
@@ -258,29 +250,25 @@ const runLinearSync = async (dataTypes?: string[]) => {
     cycles: masterData.cycles,
   };
 
-  // Filter datasets based on dataTypes parameter
-  const datasets = dataTypes && dataTypes.length > 0
-    ? Object.fromEntries(
-        Object.entries(allDatasets).filter(([name]) => dataTypes.includes(name))
-      )
-    : allDatasets;
-
   const files = await Promise.all(
     Object.entries(datasets).map(async ([name, items]) => {
+      logger.info(`Writing ${items.length} records for ${name}...`);
       const storedAt = await writeLinearDataset(name, {
         fetchedAt: masterData.fetchedAt,
         count: items.length,
         items,
       });
+      logger.info(`Stored ${name} dataset at ${storedAt}`);
       return { name, filePath: storedAt, count: items.length };
     }),
   );
 
+  logger.info("Sync completed.");
   return {
     workspaceId: LINEAR_WORKSPACE_ID,
+    source: "remote",
     fetchedAt: masterData.fetchedAt,
     files,
-    ...(dataTypes && dataTypes.length > 0 ? { syncedTypes: dataTypes } : {}),
   };
 };
 
@@ -332,7 +320,7 @@ const runLinear = async (args: string[]) => {
       case "issue": {
         const [issueKey] = positionalArgs;
         if (!issueKey) {
-          console.error("Usage: bun run index.ts linear issue <KEY>");
+          console.error("Usage: cli-name linear issue <KEY>");
           process.exit(1);
         }
         payload = await runLinearIssueByKey(issueKey);
@@ -360,10 +348,7 @@ const runLinear = async (args: string[]) => {
         collectionKey = "issues";
         break;
       case "sync": {
-        // Parse comma-separated data types from positional args
-        const dataTypesArg = positionalArgs[0];
-        const dataTypes = dataTypesArg ? dataTypesArg.split(",").map(t => t.trim()) : undefined;
-        payload = await runLinearSync(dataTypes);
+        payload = await runLinearSync();
         break;
       }
       default:
