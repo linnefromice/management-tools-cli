@@ -1,6 +1,14 @@
 import { CliUsageError, resolveGreetingFromArgs } from "./src/greet";
 import {
   LINEAR_WORKSPACE_ID,
+  type LinearProjectSummary,
+  type LinearProjectFull,
+  type LinearTeamSummary,
+  type LinearTeamFull,
+  type LinearIssueFull,
+  type LinearUserFull,
+  type LinearLabelFull,
+  type LinearCycleFull,
   fetchWorkspaceProjects,
   fetchWorkspaceTeams,
   fetchWorkspaceIssues,
@@ -9,7 +17,12 @@ import {
   fetchWorkspaceCycles,
   fetchLinearMasterData,
 } from "./src/linear";
-import { findStoredIssueByKey, searchStoredIssues, writeLinearDataset } from "./src/storage";
+import {
+  findStoredIssueByKey,
+  readLinearDataset,
+  searchStoredIssues,
+  writeLinearDataset,
+} from "./src/storage";
 import { getUsageText, getLinearUsageText } from "./src/help";
 import { normalizeFormat, printPayload } from "./src/output";
 
@@ -50,6 +63,7 @@ const getPositionalArgs = (args: string[]) =>
   args.filter((token) => token && !token.startsWith("--"));
 
 const parseOutputFormat = (args: string[]) => normalizeFormat(getFlagValue(args, "format"));
+const parseRemoteFlag = (args: string[]) => args.includes("--remote");
 
 if (!command) {
   exitWithUsage();
@@ -67,61 +81,112 @@ const runGreet = () => {
   }
 };
 
-const runLinearProjects = async (wantsFull: boolean) => {
-  const projects = await fetchWorkspaceProjects({ full: wantsFull });
+const readDatasetOrThrow = async <T>(name: string) => {
+  try {
+    return await readLinearDataset<T>(name);
+  } catch {
+    throw new Error(
+      `Local dataset "${name}" not found. Run "bun run index.ts linear sync --remote" or re-run this command with --remote.`,
+    );
+  }
+};
+
+const getDataset = async <T>(
+  name: string,
+  remote: boolean,
+  fetcher: () => Promise<T[]>,
+): Promise<{ fetchedAt: string; items: T[]; source: "remote" | "local" }> => {
+  if (remote) {
+    const items = await fetcher();
+    const fetchedAt = new Date().toISOString();
+    await writeLinearDataset(name, { fetchedAt, count: items.length, items });
+    return { fetchedAt, items, source: "remote" };
+  }
+
+  const dataset = await readDatasetOrThrow<T>(name);
+  return { fetchedAt: dataset.fetchedAt, items: dataset.items, source: "local" };
+};
+
+const runLinearProjects = async (wantsFull: boolean, remote: boolean) => {
+  const dataset = await getDataset<LinearProjectSummary | LinearProjectFull>(
+    "projects",
+    remote,
+    () => fetchWorkspaceProjects({ full: wantsFull }) as Promise<
+      Array<LinearProjectSummary | LinearProjectFull>
+    >,
+  );
 
   return {
     workspaceId: LINEAR_WORKSPACE_ID,
-    full: wantsFull,
-    count: projects.length,
-    projects,
+    fetchedAt: dataset.fetchedAt,
+    source: dataset.source,
+    full: remote ? wantsFull : undefined,
+    count: dataset.items.length,
+    projects: dataset.items,
   };
 };
 
-const runLinearTeams = async (wantsFull: boolean) => {
-  const teams = await fetchWorkspaceTeams({ full: wantsFull });
+const runLinearTeams = async (wantsFull: boolean, remote: boolean) => {
+  const dataset = await getDataset<LinearTeamSummary | LinearTeamFull>(
+    "teams",
+    remote,
+    () =>
+      fetchWorkspaceTeams({ full: wantsFull }) as Promise<
+        Array<LinearTeamSummary | LinearTeamFull>
+      >,
+  );
 
   return {
     workspaceId: LINEAR_WORKSPACE_ID,
-    full: wantsFull,
-    count: teams.length,
-    teams,
+    fetchedAt: dataset.fetchedAt,
+    source: dataset.source,
+    full: remote ? wantsFull : undefined,
+    count: dataset.items.length,
+    teams: dataset.items,
   };
 };
 
-const runLinearIssues = async () => {
-  const issues = await fetchWorkspaceIssues();
+const runLinearIssues = async (remote: boolean) => {
+  const dataset = await getDataset<LinearIssueFull>("issues", remote, () => fetchWorkspaceIssues());
   return {
     workspaceId: LINEAR_WORKSPACE_ID,
-    count: issues.length,
-    issues,
+    fetchedAt: dataset.fetchedAt,
+    source: dataset.source,
+    count: dataset.items.length,
+    issues: dataset.items,
   };
 };
 
-const runLinearUsers = async () => {
-  const users = await fetchWorkspaceUsers();
+const runLinearUsers = async (remote: boolean) => {
+  const dataset = await getDataset<LinearUserFull>("users", remote, () => fetchWorkspaceUsers());
   return {
     workspaceId: LINEAR_WORKSPACE_ID,
-    count: users.length,
-    users,
+    fetchedAt: dataset.fetchedAt,
+    source: dataset.source,
+    count: dataset.items.length,
+    users: dataset.items,
   };
 };
 
-const runLinearLabels = async () => {
-  const labels = await fetchWorkspaceLabels();
+const runLinearLabels = async (remote: boolean) => {
+  const dataset = await getDataset<LinearLabelFull>("labels", remote, () => fetchWorkspaceLabels());
   return {
     workspaceId: LINEAR_WORKSPACE_ID,
-    count: labels.length,
-    labels,
+    fetchedAt: dataset.fetchedAt,
+    source: dataset.source,
+    count: dataset.items.length,
+    labels: dataset.items,
   };
 };
 
-const runLinearCycles = async () => {
-  const cycles = await fetchWorkspaceCycles();
+const runLinearCycles = async (remote: boolean) => {
+  const dataset = await getDataset<LinearCycleFull>("cycles", remote, () => fetchWorkspaceCycles());
   return {
     workspaceId: LINEAR_WORKSPACE_ID,
-    count: cycles.length,
-    cycles,
+    fetchedAt: dataset.fetchedAt,
+    source: dataset.source,
+    count: dataset.items.length,
+    cycles: dataset.items,
   };
 };
 
@@ -193,6 +258,7 @@ const runLinear = async (args: string[]) => {
 
   const format = parseOutputFormat(linearArgs);
   const wantsFull = linearArgs.includes("--full");
+  const useRemote = parseRemoteFlag(linearArgs);
   const positionalArgs = getPositionalArgs(linearArgs);
 
   try {
@@ -201,11 +267,11 @@ const runLinear = async (args: string[]) => {
 
     switch (subCommand) {
       case "projects":
-        payload = await runLinearProjects(wantsFull);
+        payload = await runLinearProjects(wantsFull, useRemote);
         collectionKey = "projects";
         break;
       case "teams":
-        payload = await runLinearTeams(wantsFull);
+        payload = await runLinearTeams(wantsFull, useRemote);
         collectionKey = "teams";
         break;
       case "issue": {
@@ -219,19 +285,19 @@ const runLinear = async (args: string[]) => {
         break;
       }
       case "issues":
-        payload = await runLinearIssues();
+        payload = await runLinearIssues(useRemote);
         collectionKey = "issues";
         break;
       case "users":
-        payload = await runLinearUsers();
+        payload = await runLinearUsers(useRemote);
         collectionKey = "users";
         break;
       case "labels":
-        payload = await runLinearLabels();
+        payload = await runLinearLabels(useRemote);
         collectionKey = "labels";
         break;
       case "cycles":
-        payload = await runLinearCycles();
+        payload = await runLinearCycles(useRemote);
         collectionKey = "cycles";
         break;
       case "issues-local":

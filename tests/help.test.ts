@@ -16,6 +16,11 @@ describe("getUsageText", () => {
     const usage = getUsageText();
     expect(usage).toContain("[--format csv]");
   });
+
+  test("mentions remote flag", () => {
+    const usage = getUsageText();
+    expect(usage).toContain("[--remote]");
+  });
 });
 
 describe("getLinearUsageText", () => {
