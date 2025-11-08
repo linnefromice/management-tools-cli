@@ -29,14 +29,14 @@ After configuring env vars you can inspect Linear data via subcommands:
 
 | Command | Description | Useful flags |
 | --- | --- | --- |
-| `bun run index.ts linear projects` | List projects from local cache by default | `--full` (raw payload), `--format csv`, `--remote` (refresh cache via API) |
-| `bun run index.ts linear teams` | List teams | `--full`, `--format csv`, `--remote` |
-| `bun run index.ts linear issue <KEY>` | Retrieve a single issue (from local storage) by key such as `CORE-123` | `--format csv` (treats the single issue as a dataset) |
-| `bun run index.ts linear issues` | List issues from cache | `--format csv`, `--remote` |
-| `bun run index.ts linear users` | List members | `--format csv`, `--remote` |
-| `bun run index.ts linear labels` | List issue labels | `--format csv`, `--remote` |
-| `bun run index.ts linear cycles` | List cycles | `--format csv`, `--remote` |
-| `bun run index.ts linear issues-local` | Query issues already synced to disk | `--project <id>`, `--label <id>`, `--cycle <id>`, `--format csv` |
+| `bun run index.ts linear projects` | List projects from local cache by default | `--full` (raw payload), `--format csv`, `--remote` (refresh cache via API), `--output [path]` |
+| `bun run index.ts linear teams` | List teams | `--full`, `--format csv`, `--remote`, `--output [path]` |
+| `bun run index.ts linear issue <KEY>` | Retrieve a single issue (from local storage) by key such as `CORE-123` | `--format csv`, `--output [path]` |
+| `bun run index.ts linear issues` | List issues from cache | `--format csv`, `--remote`, `--output [path]` |
+| `bun run index.ts linear users` | List members | `--format csv`, `--remote`, `--output [path]` |
+| `bun run index.ts linear labels` | List issue labels | `--format csv`, `--remote`, `--output [path]` |
+| `bun run index.ts linear cycles` | List cycles | `--format csv`, `--remote`, `--output [path]` |
+| `bun run index.ts linear search-issues` | Query issues already synced to disk | `--project <id>`, `--label <id>`, `--cycle <id>`, `--format csv`, `--output [path]` |
 | `bun run index.ts linear sync` | Download teams, projects, issues, users, labels, cycles and store them under `storage/linear/` for offline analysis | — |
 
 > ヒント: `--remote` を付けると対象データを Linear API から再取得し、ローカルの `storage/linear/*.json` も自動更新します。指定しない場合は最新のローカルキャッシュを読み込みます。
@@ -45,10 +45,16 @@ After configuring env vars you can inspect Linear data via subcommands:
 
 All list-style commands default to pretty JSON. Add `--format csv` to emit a CSV table (helpful when piping to spreadsheets or passing a compact prompt into an LLM). CSV conversion requires the command to know which collection to print; that is handled automatically when `--format csv` is supported.
 
+### File output
+
+- すべての参照系コマンドは `--output` フラグに対応しています。`--output /path/to/file.csv` のように指定すると標準出力に加えてファイルにも書き出します。
+- パスを省略して `--output` だけ指定した場合は `storage/exports/<command>-YYYY-MM-DDTHH-MM-SS.<ext>` のようなユニークなファイルを自動生成します（`<ext>` は `--format` に応じて `.csv` か `.json`）。
+- データはそのまま LLM への入力や分析の下準備として活用できます。
+
 ### Local storage workflow
 
 1. Run `bun run index.ts linear sync` to refresh cached JSON files (`storage/linear/*.json`).
-2. Use `linear issue <KEY>` or `linear issues-local` with filters to query the cached data without hitting the API.
+2. Use `linear issue <KEY>` or `linear search-issues` with filters (optionally `--output` + `--format csv`) to query the cached data without hitting the API.
 3. These local datasets become the source of truth for LLM prompt generation, diffing, or additional offline tooling.
 
 ## Testing

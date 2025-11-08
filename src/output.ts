@@ -1,3 +1,6 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+
 export type OutputFormat = "json" | "csv";
 
 export const normalizeFormat = (value?: string): OutputFormat =>
@@ -48,16 +51,31 @@ const extractRecords = (payload: unknown, collectionKey?: string) => {
   return [];
 };
 
-export const printPayload = (payload: unknown, format: OutputFormat, options?: PrintOptions) => {
+export const renderPayload = (payload: unknown, format: OutputFormat, options?: PrintOptions) => {
   if (format === "csv") {
     if (!options?.collectionKey) {
-      console.log(JSON.stringify(payload, null, 2));
-      return;
+      return JSON.stringify(payload, null, 2);
     }
+
     const records = extractRecords(payload, options.collectionKey);
-    console.log(arrayToCsv(records as Record<string, unknown>[]));
-    return;
+    return arrayToCsv(records as Record<string, unknown>[]);
   }
 
-  console.log(JSON.stringify(payload, null, 2));
+  return JSON.stringify(payload, null, 2);
+};
+
+export const printPayload = (payload: unknown, format: OutputFormat, options?: PrintOptions) => {
+  console.log(renderPayload(payload, format, options));
+};
+
+export const writePayload = async (
+  payload: unknown,
+  format: OutputFormat,
+  options: PrintOptions | undefined,
+  filePath: string,
+) => {
+  const output = renderPayload(payload, format, options);
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, output, "utf-8");
+  return filePath;
 };

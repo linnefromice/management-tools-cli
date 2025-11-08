@@ -1,3 +1,4 @@
+import path from "node:path";
 import { CliUsageError, resolveGreetingFromArgs } from "./src/greet";
 import {
   LINEAR_WORKSPACE_ID,
@@ -24,7 +25,7 @@ import {
   writeLinearDataset,
 } from "./src/storage";
 import { getUsageText, getLinearUsageText } from "./src/help";
-import { normalizeFormat, printPayload } from "./src/output";
+import { normalizeFormat, printPayload, writePayload } from "./src/output";
 
 const [, , command, ...rawArgs] = process.argv;
 
@@ -41,6 +42,9 @@ const exitWithUsage = (message?: string) => {
   printHelp();
   process.exit(1);
 };
+
+const hasFlag = (args: string[], flag: string) =>
+  args.some((token) => token === `--${flag}` || token.startsWith(`--${flag}=`));
 
 const getFlagValue = (args: string[], flag: string): string | undefined => {
   for (let i = 0; i < args.length; i += 1) {
@@ -59,11 +63,39 @@ const getFlagValue = (args: string[], flag: string): string | undefined => {
   return undefined;
 };
 
-const getPositionalArgs = (args: string[]) =>
-  args.filter((token) => token && !token.startsWith("--"));
+const flagsRequiringValue = new Set(["--format", "--project", "--label", "--cycle", "--output"]);
+
+const getPositionalArgs = (args: string[]) => {
+  const positional: string[] = [];
+
+  for (let i = 0; i < args.length; i += 1) {
+    const token = args[i];
+    if (!token) continue;
+    if (token.startsWith("--")) continue;
+
+    const prev = args[i - 1];
+    const prevFlag = prev?.split("=", 1)[0];
+    if (prevFlag && flagsRequiringValue.has(prevFlag)) continue;
+
+    positional.push(token);
+  }
+
+  return positional;
+};
 
 const parseOutputFormat = (args: string[]) => normalizeFormat(getFlagValue(args, "format"));
-const parseRemoteFlag = (args: string[]) => args.includes("--remote");
+const parseRemoteFlag = (args: string[]) => hasFlag(args, "remote");
+const parseOutputOption = (args: string[]) => ({
+  enabled: hasFlag(args, "output"),
+  path: getFlagValue(args, "output"),
+});
+
+const buildDefaultOutputPath = (commandKey: string, format: string) => {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const ext = format === "csv" ? "csv" : "json";
+  const dir = path.resolve(process.cwd(), "storage", "exports");
+  return path.join(dir, `${commandKey}-${timestamp}.${ext}`);
+};
 
 if (!command) {
   exitWithUsage();
@@ -202,9 +234,22 @@ const runLinearIssueByKey = async (issueKey: string) => {
   };
 };
 
-const runLinearSync = async () => {
+const runLinearSync = async (dataTypes?: string[]) => {
+  // Define valid data types
+  const validTypes = ["teams", "projects", "issues", "users", "labels", "cycles"];
+
+  // Validate that all requested data types are valid before fetching data
+  if (dataTypes && dataTypes.length > 0) {
+    const invalidTypes = dataTypes.filter(type => !validTypes.includes(type));
+    if (invalidTypes.length > 0) {
+      throw new Error(
+        `Invalid data type(s): ${invalidTypes.join(", ")}. Valid types are: ${validTypes.join(", ")}`
+      );
+    }
+  }
+
   const masterData = await fetchLinearMasterData();
-  const datasets = {
+  const allDatasets = {
     teams: masterData.teams,
     projects: masterData.projects,
     issues: masterData.issues,
@@ -212,6 +257,13 @@ const runLinearSync = async () => {
     labels: masterData.labels,
     cycles: masterData.cycles,
   };
+
+  // Filter datasets based on dataTypes parameter
+  const datasets = dataTypes && dataTypes.length > 0
+    ? Object.fromEntries(
+        Object.entries(allDatasets).filter(([name]) => dataTypes.includes(name))
+      )
+    : allDatasets;
 
   const files = await Promise.all(
     Object.entries(datasets).map(async ([name, items]) => {
@@ -228,6 +280,7 @@ const runLinearSync = async () => {
     workspaceId: LINEAR_WORKSPACE_ID,
     fetchedAt: masterData.fetchedAt,
     files,
+    ...(dataTypes && dataTypes.length > 0 ? { syncedTypes: dataTypes } : {}),
   };
 };
 
@@ -243,6 +296,7 @@ const runLinearIssuesLocal = async (args: string[]) => {
 
   return {
     workspaceId: LINEAR_WORKSPACE_ID,
+    source: "local",
     ...result,
   };
 };
@@ -260,6 +314,7 @@ const runLinear = async (args: string[]) => {
   const wantsFull = linearArgs.includes("--full");
   const useRemote = parseRemoteFlag(linearArgs);
   const positionalArgs = getPositionalArgs(linearArgs);
+  const outputOption = parseOutputOption(linearArgs);
 
   try {
     let payload: Record<string, unknown>;
@@ -300,13 +355,17 @@ const runLinear = async (args: string[]) => {
         payload = await runLinearCycles(useRemote);
         collectionKey = "cycles";
         break;
-      case "issues-local":
+      case "search-issues":
         payload = await runLinearIssuesLocal(linearArgs);
         collectionKey = "issues";
         break;
-      case "sync":
-        payload = await runLinearSync();
+      case "sync": {
+        // Parse comma-separated data types from positional args
+        const dataTypesArg = positionalArgs[0];
+        const dataTypes = dataTypesArg ? dataTypesArg.split(",").map(t => t.trim()) : undefined;
+        payload = await runLinearSync(dataTypes);
         break;
+      }
       default:
         console.error(`Unknown linear subcommand: ${subCommand}`);
         printLinearHelp();
@@ -314,6 +373,14 @@ const runLinear = async (args: string[]) => {
     }
 
     printPayload(payload, format, { collectionKey });
+
+    if (outputOption.enabled) {
+      const targetPath = outputOption.path
+        ? path.resolve(process.cwd(), outputOption.path)
+        : buildDefaultOutputPath(`linear-${subCommand}`, format);
+      await writePayload(payload, format, { collectionKey }, targetPath);
+      console.log(`Saved output to ${targetPath}`);
+    }
   } catch (error) {
     console.error("Failed to execute linear command.");
     if (error instanceof Error) {
