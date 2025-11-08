@@ -118,7 +118,7 @@ const readDatasetOrThrow = async <T>(name: string) => {
     return await readLinearDataset<T>(name);
   } catch {
     throw new Error(
-      `Local dataset "${name}" not found. Run "bun run index.ts linear sync --remote" or re-run this command with --remote.`,
+      `Local dataset "${name}" not found. Run "cli-name linear sync --remote" or re-run this command with --remote.`,
     );
   }
 };
@@ -332,7 +332,7 @@ const runLinear = async (args: string[]) => {
       case "issue": {
         const [issueKey] = positionalArgs;
         if (!issueKey) {
-          console.error("Usage: bun run index.ts linear issue <KEY>");
+          console.error("Usage: cli-name linear issue <KEY>");
           process.exit(1);
         }
         payload = await runLinearIssueByKey(issueKey);

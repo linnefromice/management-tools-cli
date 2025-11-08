@@ -1,23 +1,23 @@
 export const getUsageText = () => `Usage:
-  bun run index.ts help
-  bun run index.ts greet --hour <HH> --name <YourName>
-  bun run index.ts linear projects [--full] [--format csv] [--remote] [--output <PATH>]
-  bun run index.ts linear teams [--full] [--format csv] [--remote] [--output <PATH>]
-  bun run index.ts linear issue <KEY> [--format csv] [--output <PATH>]
-  bun run index.ts linear issues [--format csv] [--remote] [--output <PATH>]
-  bun run index.ts linear users [--format csv] [--remote] [--output <PATH>]
-  bun run index.ts linear labels [--format csv] [--remote] [--output <PATH>]
-  bun run index.ts linear cycles [--format csv] [--remote] [--output <PATH>]
-  bun run index.ts linear search-issues [--project <ID>] [--label <ID>] [--cycle <ID>] [--format csv] [--output <PATH>]
-  bun run index.ts linear sync`;
+  cli-name help
+  cli-name greet --hour <HH> --name <YourName>
+  cli-name linear projects [--full] [--format csv] [--remote] [--output <PATH>]
+  cli-name linear teams [--full] [--format csv] [--remote] [--output <PATH>]
+  cli-name linear issue <KEY> [--format csv] [--output <PATH>]
+  cli-name linear issues [--format csv] [--remote] [--output <PATH>]
+  cli-name linear users [--format csv] [--remote] [--output <PATH>]
+  cli-name linear labels [--format csv] [--remote] [--output <PATH>]
+  cli-name linear cycles [--format csv] [--remote] [--output <PATH>]
+  cli-name linear search-issues [--project <ID>] [--label <ID>] [--cycle <ID>] [--format csv] [--output <PATH>]
+  cli-name linear sync`;
 
 export const getLinearUsageText = () => `Linear commands:
-  bun run index.ts linear projects [--full] [--format csv] [--remote] [--output <PATH>]
-  bun run index.ts linear teams [--full] [--format csv] [--remote] [--output <PATH>]
-  bun run index.ts linear issue <KEY> [--format csv] [--output <PATH>]
-  bun run index.ts linear issues [--format csv] [--remote] [--output <PATH>]
-  bun run index.ts linear users [--format csv] [--remote] [--output <PATH>]
-  bun run index.ts linear labels [--format csv] [--remote] [--output <PATH>]
-  bun run index.ts linear cycles [--format csv] [--remote] [--output <PATH>]
-  bun run index.ts linear search-issues [--project <ID>] [--label <ID>] [--cycle <ID>] [--format csv] [--output <PATH>]
-  bun run index.ts linear sync`;
+  cli-name linear projects [--full] [--format csv] [--remote] [--output <PATH>]
+  cli-name linear teams [--full] [--format csv] [--remote] [--output <PATH>]
+  cli-name linear issue <KEY> [--format csv] [--output <PATH>]
+  cli-name linear issues [--format csv] [--remote] [--output <PATH>]
+  cli-name linear users [--format csv] [--remote] [--output <PATH>]
+  cli-name linear labels [--format csv] [--remote] [--output <PATH>]
+  cli-name linear cycles [--format csv] [--remote] [--output <PATH>]
+  cli-name linear search-issues [--project <ID>] [--label <ID>] [--cycle <ID>] [--format csv] [--output <PATH>]
+  cli-name linear sync`;
