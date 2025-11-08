@@ -21,6 +21,11 @@ describe("getUsageText", () => {
     const usage = getUsageText();
     expect(usage).toContain("[--remote]");
   });
+
+  test("mentions output flag", () => {
+    const usage = getUsageText();
+    expect(usage).toContain("[--output <PATH>]");
+  });
 });
 
 describe("getLinearUsageText", () => {

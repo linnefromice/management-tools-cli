@@ -1,5 +1,8 @@
 import { describe, expect, test, spyOn } from "bun:test";
-import { arrayToCsv, printPayload, normalizeFormat } from "../src/output";
+import { mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { arrayToCsv, printPayload, normalizeFormat, writePayload } from "../src/output";
 
 describe("normalizeFormat", () => {
   test("defaults to json", () => {
@@ -37,5 +40,15 @@ describe("printPayload", () => {
     printPayload({ items: [{ id: 1, name: "Item" }] }, "csv", { collectionKey: "items" });
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
+  });
+});
+
+describe("writePayload", () => {
+  test("writes payload to disk", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "cli-output-"));
+    const target = path.join(dir, "data.csv");
+    await writePayload({ rows: [{ id: 1 }] }, "csv", { collectionKey: "rows" }, target);
+    const content = await readFile(target, "utf-8");
+    expect(content).toContain("id");
   });
 });
