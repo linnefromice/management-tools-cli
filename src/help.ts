@@ -8,7 +8,7 @@ export const getUsageText = () => `Usage:
   bun run index.ts linear users [--format csv] [--remote]
   bun run index.ts linear labels [--format csv] [--remote]
   bun run index.ts linear cycles [--format csv] [--remote]
-  bun run index.ts linear issues-local [--project <ID>] [--label <ID>] [--cycle <ID>] [--format csv]
+  bun run index.ts linear search-issues [--project <ID>] [--label <ID>] [--cycle <ID>] [--format csv]
   bun run index.ts linear sync`;
 
 export const getLinearUsageText = () => `Linear commands:
@@ -19,5 +19,5 @@ export const getLinearUsageText = () => `Linear commands:
   bun run index.ts linear users [--format csv] [--remote]
   bun run index.ts linear labels [--format csv] [--remote]
   bun run index.ts linear cycles [--format csv] [--remote]
-  bun run index.ts linear issues-local [--project <ID>] [--label <ID>] [--cycle <ID>] [--format csv]
+  bun run index.ts linear search-issues [--project <ID>] [--label <ID>] [--cycle <ID>] [--format csv]
   bun run index.ts linear sync`;

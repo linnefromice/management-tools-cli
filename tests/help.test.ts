@@ -26,11 +26,13 @@ describe("getUsageText", () => {
 describe("getLinearUsageText", () => {
   test("includes projects subcommand", () => {
     const usage = getLinearUsageText();
-    expect(usage).toContain("bun run index.ts linear projects [--full]");
+    expect(usage).toContain("bun run index.ts linear projects [--full] [--format csv] [--remote]");
   });
 
-  test("includes issues-local filters", () => {
+  test("includes search-issues filters", () => {
     const usage = getLinearUsageText();
-    expect(usage).toContain("linear issues-local [--project <ID>] [--label <ID>] [--cycle <ID>]");
+    expect(usage).toContain(
+      "linear search-issues [--project <ID>] [--label <ID>] [--cycle <ID>] [--format csv]",
+    );
   });
 });

@@ -300,7 +300,7 @@ const runLinear = async (args: string[]) => {
         payload = await runLinearCycles(useRemote);
         collectionKey = "cycles";
         break;
-      case "issues-local":
+      case "search-issues":
         payload = await runLinearIssuesLocal(linearArgs);
         collectionKey = "issues";
         break;
