@@ -1,8 +1,11 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import type { LinearIssueFull, LinearTeamFull } from "./linear";
 
-const STORAGE_ROOT = path.resolve(process.cwd(), "storage");
-const LINEAR_DIR = path.join(STORAGE_ROOT, "linear");
+const resolveStorageRoot = () =>
+  process.env.LINEAR_STORAGE_DIR ?? path.resolve(process.cwd(), "storage");
+
+const resolveLinearDir = () => path.join(resolveStorageRoot(), "linear");
 
 const ensureDir = async (dir: string) => {
   await mkdir(dir, { recursive: true });
@@ -14,14 +17,104 @@ export type StoredDataset<T> = {
   items: T[];
 };
 
+const linearDatasetPath = (name: string) => path.join(resolveLinearDir(), `${name}.json`);
+
 export const writeLinearDataset = async <T>(
   name: string,
   payload: StoredDataset<T>,
 ): Promise<string> => {
-  await ensureDir(LINEAR_DIR);
-  const target = path.join(LINEAR_DIR, `${name}.json`);
+  const dir = resolveLinearDir();
+  await ensureDir(dir);
+  const target = linearDatasetPath(name);
   await writeFile(target, JSON.stringify(payload, null, 2), "utf-8");
   return target;
 };
 
-export const getLinearStorageDir = () => LINEAR_DIR;
+export const readLinearDataset = async <T>(name: string): Promise<StoredDataset<T>> => {
+  const file = linearDatasetPath(name);
+  const content = await readFile(file, "utf-8");
+  return JSON.parse(content) as StoredDataset<T>;
+};
+
+export type IssueSearchFilters = {
+  projectId?: string;
+  labelId?: string;
+  cycleId?: string;
+};
+
+const parseIssueKey = (issueKey: string) => {
+  const [teamKey, numberPart] = issueKey.split("-");
+  const issueNumber = Number(numberPart);
+
+  if (!teamKey || !numberPart || Number.isNaN(issueNumber)) {
+    throw new Error(`Invalid issue key: ${issueKey}. Expected format TEAM-123.`);
+  }
+
+  return { teamKey, issueNumber };
+};
+
+const getTeamKeyById = async () => {
+  const dataset = await readLinearDataset<LinearTeamFull>("teams");
+  const map = new Map<string, string>();
+  dataset.items.forEach((team) => {
+    const id = (team as { id?: string }).id;
+    const key = (team as { key?: string }).key;
+    if (id && key) {
+      map.set(id, key);
+    }
+  });
+  return map;
+};
+
+export const searchStoredIssues = async (filters: IssueSearchFilters) => {
+  const dataset = await readLinearDataset<LinearIssueFull>("issues");
+
+  const filtered = dataset.items.filter((issue) => {
+    const matchesProject = !filters.projectId || issue.projectId === filters.projectId;
+    const labelIds = (issue as { labelIds?: string[] }).labelIds ?? [];
+    const matchesLabel = !filters.labelId || labelIds.includes(filters.labelId);
+    const matchesCycle = !filters.cycleId || issue.cycleId === filters.cycleId;
+    return matchesProject && matchesLabel && matchesCycle;
+  });
+
+  return {
+    fetchedAt: dataset.fetchedAt,
+    filters,
+    count: filtered.length,
+    issues: filtered,
+  };
+};
+
+export const getLinearStorageDir = () => resolveLinearDir();
+
+export const findStoredIssueByKey = async (issueKey: string) => {
+  const { teamKey, issueNumber } = parseIssueKey(issueKey);
+  const issuesDataset = await readLinearDataset<LinearIssueFull>("issues");
+  let teamKeyMap: Map<string, string> | null = null;
+
+  const findTeamKey = async (issue: LinearIssueFull) => {
+    const inlineKey = (issue as { team?: { key?: string } }).team?.key;
+    if (inlineKey) return inlineKey;
+
+    const teamId = (issue as { teamId?: string }).teamId;
+    if (!teamId) return undefined;
+
+    if (!teamKeyMap) {
+      teamKeyMap = await getTeamKeyById();
+    }
+
+    return teamKeyMap.get(teamId);
+  };
+
+  for (const issue of issuesDataset.items) {
+    const issueNumberValue = (issue as { number?: number }).number;
+    if (issueNumberValue !== issueNumber) continue;
+
+    const resolvedTeamKey = await findTeamKey(issue);
+    if (resolvedTeamKey === teamKey) {
+      return { fetchedAt: issuesDataset.fetchedAt, issue };
+    }
+  }
+
+  return { fetchedAt: issuesDataset.fetchedAt, issue: null };
+};

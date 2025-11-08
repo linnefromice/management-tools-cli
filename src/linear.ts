@@ -11,8 +11,13 @@ const requireEnv = (key: string): string => {
 };
 
 let linearClient: LinearClient | null = null;
+let linearClientOverride: LinearClient | null = null;
 
 const getLinearClient = () => {
+  if (linearClientOverride) {
+    return linearClientOverride;
+  }
+
   if (!linearClient) {
     linearClient = new LinearClient({
       apiKey: requireEnv("LINEAR_API_KEY"),
@@ -262,3 +267,13 @@ export const fetchWorkspaceUsers = async (): Promise<LinearUserFull[]> => fetchU
 export const fetchWorkspaceLabels = async (): Promise<LinearLabelFull[]> => fetchLabelsPlain();
 
 export const fetchWorkspaceCycles = async (): Promise<LinearCycleFull[]> => fetchCyclesPlain();
+
+export const setLinearClientForTesting = (client: LinearClient | null) => {
+  linearClientOverride = client;
+  linearClient = null;
+  validatedWorkspaceId = null;
+};
+
+export const resetLinearClientForTesting = () => {
+  setLinearClientForTesting(null);
+};

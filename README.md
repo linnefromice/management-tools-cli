@@ -28,15 +28,18 @@ These are required for `linear-projects` to authenticate against the correct wor
 Use the `linear` subcommands to inspect or cache master data locally:
 
 ```bash
-bun run index.ts linear projects --full
+bun run index.ts linear projects --full --format csv
 bun run index.ts linear teams --full
 bun run index.ts linear issues
 bun run index.ts linear users
 bun run index.ts linear labels
 bun run index.ts linear cycles
+bun run index.ts linear issues-local --project <projectId>
 bun run index.ts linear sync
 ```
 
 `linear sync` writes JSON snapshots for teams, projects, issues, users, labels, and cycles under `storage/linear/`, which is ignored by git.
+
+Pass `--format csv` to any linear subcommand that emits collections to receive CSV output instead of JSON.
 
 This project was created using `bun init` in bun v1.3.1. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.

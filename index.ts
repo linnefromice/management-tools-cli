@@ -9,36 +9,18 @@ import {
   fetchWorkspaceCycles,
   fetchLinearMasterData,
 } from "./src/linear";
-import { writeLinearDataset } from "./src/storage";
+import { findStoredIssueByKey, searchStoredIssues, writeLinearDataset } from "./src/storage";
+import { getUsageText, getLinearUsageText } from "./src/help";
+import { normalizeFormat, printPayload } from "./src/output";
 
 const [, , command, ...rawArgs] = process.argv;
 
-const usage = `Usage:
-  bun run index.ts help
-  bun run index.ts greet --hour <HH> --name <YourName>
-  bun run index.ts linear projects [--full]
-  bun run index.ts linear teams [--full]
-  bun run index.ts linear issues
-  bun run index.ts linear users
-  bun run index.ts linear labels
-  bun run index.ts linear cycles
-  bun run index.ts linear sync`;
-
-const linearUsage = `Linear commands:
-  bun run index.ts linear projects [--full]
-  bun run index.ts linear teams [--full]
-  bun run index.ts linear issues
-  bun run index.ts linear users
-  bun run index.ts linear labels
-  bun run index.ts linear cycles
-  bun run index.ts linear sync`;
-
 const printHelp = () => {
-  console.log(usage);
+  console.log(getUsageText());
 };
 
 const printLinearHelp = () => {
-  console.log(linearUsage);
+  console.log(getLinearUsageText());
 };
 
 const exitWithUsage = (message?: string) => {
@@ -46,6 +28,28 @@ const exitWithUsage = (message?: string) => {
   printHelp();
   process.exit(1);
 };
+
+const getFlagValue = (args: string[], flag: string): string | undefined => {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = args[i];
+    if (!token || !token.startsWith(`--${flag}`)) continue;
+
+    if (token.includes("=")) {
+      const [, value] = token.split("=", 2);
+      return value ?? undefined;
+    }
+
+    const next = args[i + 1];
+    return next && !next.startsWith("--") ? next : undefined;
+  }
+
+  return undefined;
+};
+
+const getPositionalArgs = (args: string[]) =>
+  args.filter((token) => token && !token.startsWith("--"));
+
+const parseOutputFormat = (args: string[]) => normalizeFormat(getFlagValue(args, "format"));
 
 if (!command) {
   exitWithUsage();
@@ -121,6 +125,18 @@ const runLinearCycles = async () => {
   };
 };
 
+const runLinearIssueByKey = async (issueKey: string) => {
+  const result = await findStoredIssueByKey(issueKey);
+
+  return {
+    workspaceId: LINEAR_WORKSPACE_ID,
+    issueKey,
+    fetchedAt: result.fetchedAt,
+    found: Boolean(result.issue),
+    issue: result.issue,
+  };
+};
+
 const runLinearSync = async () => {
   const masterData = await fetchLinearMasterData();
   const datasets = {
@@ -150,6 +166,22 @@ const runLinearSync = async () => {
   };
 };
 
+const parseIssueStorageFilters = (args: string[]) => ({
+  projectId: getFlagValue(args, "project"),
+  labelId: getFlagValue(args, "label"),
+  cycleId: getFlagValue(args, "cycle"),
+});
+
+const runLinearIssuesLocal = async (args: string[]) => {
+  const filters = parseIssueStorageFilters(args);
+  const result = await searchStoredIssues(filters);
+
+  return {
+    workspaceId: LINEAR_WORKSPACE_ID,
+    ...result,
+  };
+};
+
 const runLinear = async (args: string[]) => {
   const [subCommand, ...linearArgs] = args;
 
@@ -159,29 +191,52 @@ const runLinear = async (args: string[]) => {
     return;
   }
 
+  const format = parseOutputFormat(linearArgs);
   const wantsFull = linearArgs.includes("--full");
+  const positionalArgs = getPositionalArgs(linearArgs);
 
   try {
     let payload: Record<string, unknown>;
+    let collectionKey: string | undefined;
 
     switch (subCommand) {
       case "projects":
         payload = await runLinearProjects(wantsFull);
+        collectionKey = "projects";
         break;
       case "teams":
         payload = await runLinearTeams(wantsFull);
+        collectionKey = "teams";
         break;
+      case "issue": {
+        const [issueKey] = positionalArgs;
+        if (!issueKey) {
+          console.error("Usage: bun run index.ts linear issue <KEY>");
+          process.exit(1);
+        }
+        payload = await runLinearIssueByKey(issueKey);
+        collectionKey = "issue";
+        break;
+      }
       case "issues":
         payload = await runLinearIssues();
+        collectionKey = "issues";
         break;
       case "users":
         payload = await runLinearUsers();
+        collectionKey = "users";
         break;
       case "labels":
         payload = await runLinearLabels();
+        collectionKey = "labels";
         break;
       case "cycles":
         payload = await runLinearCycles();
+        collectionKey = "cycles";
+        break;
+      case "issues-local":
+        payload = await runLinearIssuesLocal(linearArgs);
+        collectionKey = "issues";
         break;
       case "sync":
         payload = await runLinearSync();
@@ -192,7 +247,7 @@ const runLinear = async (args: string[]) => {
         process.exit(1);
     }
 
-    console.log(JSON.stringify(payload, null, 2));
+    printPayload(payload, format, { collectionKey });
   } catch (error) {
     console.error("Failed to execute linear command.");
     if (error instanceof Error) {
