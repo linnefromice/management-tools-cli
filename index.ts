@@ -144,9 +144,10 @@ const runLinearProjects = async (wantsFull: boolean, remote: boolean) => {
   const dataset = await getDataset<LinearProjectSummary | LinearProjectFull>(
     "projects",
     remote,
-    () => fetchWorkspaceProjects({ full: wantsFull }) as Promise<
-      Array<LinearProjectSummary | LinearProjectFull>
-    >,
+    () =>
+      fetchWorkspaceProjects({ full: wantsFull }) as Promise<
+        Array<LinearProjectSummary | LinearProjectFull>
+      >,
   );
 
   return {

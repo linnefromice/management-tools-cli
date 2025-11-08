@@ -9,7 +9,11 @@ export const normalizeFormat = (value?: string): OutputFormat =>
 const escapeCsvValue = (value: unknown): string => {
   if (value === null || value === undefined) return "";
   const asString =
-    typeof value === "string" ? value : typeof value === "object" ? JSON.stringify(value) : String(value);
+    typeof value === "string"
+      ? value
+      : typeof value === "object"
+        ? JSON.stringify(value)
+        : String(value);
   const needsQuotes = /[",\n]/.test(asString);
   const escaped = asString.replace(/"/g, '""');
   return needsQuotes ? `"${escaped}"` : escaped;
