@@ -8,6 +8,8 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
+    "build:bundle": "bun build index.ts --target bun --outfile dist/strophos.js",
+    "build:binary": "bun build index.ts --compile --outfile dist/strophos",
     "check_all": "bun run lint && bun run format && bun run typecheck && bun run test"
   },
   "devDependencies": {
