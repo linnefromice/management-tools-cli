@@ -93,6 +93,7 @@ export const arrayToCsv = (rows: Record<string, unknown>[]): string => {
 
 type PrintOptions = {
   collectionKey?: string;
+  skipAnalyticsFilter?: boolean;
 };
 
 const extractRecords = (payload: unknown, collectionKey?: string) => {
@@ -111,7 +112,10 @@ const extractRecords = (payload: unknown, collectionKey?: string) => {
 };
 
 export const renderPayload = (payload: unknown, format: OutputFormat, options?: PrintOptions) => {
-  const filteredPayload = applyAnalyticsFilter(payload, options?.collectionKey);
+  const applyFilter = Boolean(options?.collectionKey) && !options?.skipAnalyticsFilter;
+  const filteredPayload = applyFilter
+    ? applyAnalyticsFilter(payload, options?.collectionKey)
+    : payload;
 
   if (format === "csv") {
     if (!options?.collectionKey) {
@@ -119,10 +123,10 @@ export const renderPayload = (payload: unknown, format: OutputFormat, options?: 
     }
 
     const records = extractRecords(filteredPayload, options.collectionKey);
-    const filteredRecords = filterCollectionRecords(
-      records as Record<string, unknown>[],
-      options.collectionKey,
-    );
+    const filteredRecords =
+      applyFilter && options.collectionKey
+        ? filterCollectionRecords(records as Record<string, unknown>[], options.collectionKey)
+        : (records as Record<string, unknown>[]);
     return arrayToCsv(filteredRecords as Record<string, unknown>[]);
   }
 

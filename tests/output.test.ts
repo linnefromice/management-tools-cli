@@ -103,4 +103,49 @@ describe("analytics field filtering", () => {
     expect(rendered.includes("project-1")).toBe(false);
     expect(rendered.includes("issue-1")).toBe(false);
   });
+
+  test("can skip filtering for json via option", () => {
+    const payload = {
+      issues: [
+        {
+          id: "issue-raw",
+          identifier: "RAW-1",
+          title: "Raw issue",
+          projectId: "project-raw",
+        },
+      ],
+    };
+
+    const rendered = renderPayload(payload, "json", {
+      collectionKey: "issues",
+      skipAnalyticsFilter: true,
+    });
+    const parsed = JSON.parse(rendered) as { issues: Array<Record<string, unknown>> };
+
+    expect(parsed.issues[0]).toMatchObject({
+      id: "issue-raw",
+      identifier: "RAW-1",
+      projectId: "project-raw",
+    });
+  });
+
+  test("can skip filtering for csv via option", () => {
+    const payload = {
+      issues: [
+        {
+          id: "issue-raw",
+          identifier: "RAW-1",
+          title: "Raw issue",
+        },
+      ],
+    };
+
+    const rendered = renderPayload(payload, "csv", {
+      collectionKey: "issues",
+      skipAnalyticsFilter: true,
+    });
+
+    expect(rendered.startsWith("id,identifier,title")).toBe(true);
+    expect(rendered.includes("issue-raw")).toBe(true);
+  });
 });
