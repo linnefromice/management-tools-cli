@@ -2,7 +2,13 @@ import { describe, expect, test, spyOn } from "bun:test";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { arrayToCsv, printPayload, normalizeFormat, writePayload } from "../src/output";
+import {
+  arrayToCsv,
+  printPayload,
+  normalizeFormat,
+  renderPayload,
+  writePayload,
+} from "../src/output";
 
 describe("normalizeFormat", () => {
   test("defaults to json", () => {
@@ -50,5 +56,51 @@ describe("writePayload", () => {
     await writePayload({ rows: [{ id: 1 }] }, "csv", { collectionKey: "rows" }, target);
     const content = await readFile(target, "utf-8");
     expect(content).toContain("id");
+  });
+});
+
+describe("analytics field filtering", () => {
+  test("filters json payload down to analytics fields", () => {
+    const payload = {
+      issues: [
+        {
+          id: "issue-1",
+          identifier: "CORE-1",
+          title: "Fix bug",
+          description: "details",
+          projectId: "project-1",
+        },
+      ],
+    };
+
+    const rendered = renderPayload(payload, "json", { collectionKey: "issues" });
+    const parsed = JSON.parse(rendered) as { issues: Array<Record<string, unknown>> };
+
+    expect(parsed.issues[0]).toEqual({
+      identifier: "CORE-1",
+      title: "Fix bug",
+      description: "details",
+    });
+  });
+
+  test("filters csv payload headers", () => {
+    const payload = {
+      issues: [
+        {
+          id: "issue-1",
+          identifier: "CORE-1",
+          title: "Fix bug",
+          description: "details",
+          projectId: "project-1",
+        },
+      ],
+    };
+
+    const rendered = renderPayload(payload, "csv", { collectionKey: "issues" });
+    const [headerLine] = rendered.split("\n");
+
+    expect(headerLine.split(",")).toEqual(["identifier", "title", "description"]);
+    expect(rendered.includes("project-1")).toBe(false);
+    expect(rendered.includes("issue-1")).toBe(false);
   });
 });

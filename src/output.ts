@@ -6,6 +6,99 @@ export type OutputFormat = "json" | "csv";
 export const normalizeFormat = (value?: string): OutputFormat =>
   value?.toLowerCase() === "csv" ? "csv" : "json";
 
+const ANALYTICS_FIELD_WHITELIST: Record<string, readonly string[]> = {
+  issues: [
+    "identifier",
+    "title",
+    "description",
+    "priority",
+    "priorityLabel",
+    "prioritySortOrder",
+    "branchName",
+    "url",
+    "dueDate",
+    "estimate",
+    "customerTicketCount",
+    "syncedWith",
+    "reactions",
+    "reactionData",
+    "slaType",
+    "slaBreachesAt",
+    "slaHighRiskAt",
+    "slaMediumRiskAt",
+    "slaStartedAt",
+    "snoozedUntilAt",
+    "trashed",
+    "sortOrder",
+    "createdAt",
+    "updatedAt",
+    "completedAt",
+    "archivedAt",
+    "autoArchivedAt",
+    "autoClosedAt",
+    "canceledAt",
+    "startedAt",
+    "startedTriageAt",
+    "triagedAt",
+    "addedToCycleAt",
+    "addedToProjectAt",
+    "addedToTeamAt",
+  ],
+  projects: [
+    "name",
+    "state",
+    "status",
+    "description",
+    "targetDate",
+    "startDate",
+    "endDate",
+    "createdAt",
+    "updatedAt",
+    "health",
+    "color",
+    "progress",
+    "url",
+  ],
+  teams: [
+    "name",
+    "key",
+    "description",
+    "cycleLength",
+    "triageActivated",
+    "color",
+    "timezone",
+    "issueEstimationType",
+    "createdAt",
+    "updatedAt",
+  ],
+  users: [
+    "name",
+    "displayName",
+    "email",
+    "active",
+    "admin",
+    "avatarUrl",
+    "statusEmoji",
+    "statusLabel",
+    "disabledAt",
+    "createdAt",
+    "updatedAt",
+  ],
+  labels: ["name", "description", "color", "archivedAt", "createdAt", "updatedAt"],
+  cycles: [
+    "name",
+    "number",
+    "status",
+    "description",
+    "startsAt",
+    "endsAt",
+    "completedAt",
+    "progress",
+    "createdAt",
+    "updatedAt",
+  ],
+};
+
 const escapeCsvValue = (value: unknown): string => {
   if (value === null || value === undefined) return "";
   const asString =
@@ -17,6 +110,60 @@ const escapeCsvValue = (value: unknown): string => {
   const needsQuotes = /[",\n]/.test(asString);
   const escaped = asString.replace(/"/g, '""');
   return needsQuotes ? `"${escaped}"` : escaped;
+};
+
+const filterRecordFields = (record: Record<string, unknown>, collectionKey?: string) => {
+  if (!collectionKey) return record;
+  const whitelist = ANALYTICS_FIELD_WHITELIST[collectionKey];
+  if (!whitelist) return record;
+
+  const filtered: Record<string, unknown> = {};
+  whitelist.forEach((field) => {
+    if (record[field] !== undefined) {
+      filtered[field] = record[field];
+    }
+  });
+
+  return filtered;
+};
+
+const filterCollectionRecords = (records: Record<string, unknown>[], collectionKey?: string) => {
+  if (!collectionKey) return records;
+  const whitelist = ANALYTICS_FIELD_WHITELIST[collectionKey];
+  if (!whitelist) return records;
+  return records.map((record) => filterRecordFields(record, collectionKey));
+};
+
+const applyAnalyticsFilter = (payload: unknown, collectionKey?: string) => {
+  if (!collectionKey) return payload;
+  const whitelist = ANALYTICS_FIELD_WHITELIST[collectionKey];
+  if (!whitelist) return payload;
+
+  if (!payload || typeof payload !== "object") {
+    return payload;
+  }
+
+  if (Array.isArray(payload)) {
+    return filterCollectionRecords(payload as Record<string, unknown>[], collectionKey);
+  }
+
+  const working = { ...(payload as Record<string, unknown>) };
+  const value = working[collectionKey];
+
+  if (Array.isArray(value)) {
+    working[collectionKey] = filterCollectionRecords(
+      value as Record<string, unknown>[],
+      collectionKey,
+    );
+    return working;
+  }
+
+  if (value && typeof value === "object") {
+    working[collectionKey] = filterRecordFields(value as Record<string, unknown>, collectionKey);
+    return working;
+  }
+
+  return working;
 };
 
 export const arrayToCsv = (rows: Record<string, unknown>[]): string => {
@@ -56,16 +203,22 @@ const extractRecords = (payload: unknown, collectionKey?: string) => {
 };
 
 export const renderPayload = (payload: unknown, format: OutputFormat, options?: PrintOptions) => {
+  const filteredPayload = applyAnalyticsFilter(payload, options?.collectionKey);
+
   if (format === "csv") {
     if (!options?.collectionKey) {
-      return JSON.stringify(payload, null, 2);
+      return JSON.stringify(filteredPayload, null, 2);
     }
 
-    const records = extractRecords(payload, options.collectionKey);
-    return arrayToCsv(records as Record<string, unknown>[]);
+    const records = extractRecords(filteredPayload, options.collectionKey);
+    const filteredRecords = filterCollectionRecords(
+      records as Record<string, unknown>[],
+      options.collectionKey,
+    );
+    return arrayToCsv(filteredRecords as Record<string, unknown>[]);
   }
 
-  return JSON.stringify(payload, null, 2);
+  return JSON.stringify(filteredPayload, null, 2);
 };
 
 export const printPayload = (payload: unknown, format: OutputFormat, options?: PrintOptions) => {
