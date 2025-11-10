@@ -86,6 +86,7 @@ const getPositionalArgs = (args: string[]) => {
 
 const parseOutputFormat = (args: string[]) => normalizeFormat(getFlagValue(args, "format"));
 const parseRemoteFlag = (args: string[]) => hasFlag(args, "remote");
+const parseAllFieldsFlag = (args: string[]) => hasFlag(args, "all-fields");
 const parseOutputOption = (args: string[]) => ({
   enabled: hasFlag(args, "output"),
   path: getFlagValue(args, "output"),
@@ -301,6 +302,7 @@ const runLinear = async (args: string[]) => {
   const format = parseOutputFormat(linearArgs);
   const wantsFull = linearArgs.includes("--full");
   const useRemote = parseRemoteFlag(linearArgs);
+  const skipAnalyticsFilter = parseAllFieldsFlag(linearArgs);
   const positionalArgs = getPositionalArgs(linearArgs);
   const outputOption = parseOutputOption(linearArgs);
 
@@ -357,13 +359,13 @@ const runLinear = async (args: string[]) => {
         process.exit(1);
     }
 
-    printPayload(payload, format, { collectionKey });
+    printPayload(payload, format, { collectionKey, skipAnalyticsFilter });
 
     if (outputOption.enabled) {
       const targetPath = outputOption.path
         ? path.resolve(process.cwd(), outputOption.path)
         : buildDefaultOutputPath(`linear-${subCommand}`, format);
-      await writePayload(payload, format, { collectionKey }, targetPath);
+      await writePayload(payload, format, { collectionKey, skipAnalyticsFilter }, targetPath);
       console.log(`Saved output to ${targetPath}`);
     }
   } catch (error) {

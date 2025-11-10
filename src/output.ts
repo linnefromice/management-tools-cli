@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { ANALYTICS_FIELD_WHITELIST } from "./constants";
 
 export type OutputFormat = "json" | "csv";
 
@@ -17,6 +18,60 @@ const escapeCsvValue = (value: unknown): string => {
   const needsQuotes = /[",\n]/.test(asString);
   const escaped = asString.replace(/"/g, '""');
   return needsQuotes ? `"${escaped}"` : escaped;
+};
+
+const filterRecordFields = (record: Record<string, unknown>, collectionKey?: string) => {
+  if (!collectionKey) return record;
+  const whitelist = ANALYTICS_FIELD_WHITELIST[collectionKey];
+  if (!whitelist) return record;
+
+  const filtered: Record<string, unknown> = {};
+  whitelist.forEach((field) => {
+    if (record[field] !== undefined) {
+      filtered[field] = record[field];
+    }
+  });
+
+  return filtered;
+};
+
+const filterCollectionRecords = (records: Record<string, unknown>[], collectionKey?: string) => {
+  if (!collectionKey) return records;
+  const whitelist = ANALYTICS_FIELD_WHITELIST[collectionKey];
+  if (!whitelist) return records;
+  return records.map((record) => filterRecordFields(record, collectionKey));
+};
+
+const applyAnalyticsFilter = (payload: unknown, collectionKey?: string) => {
+  if (!collectionKey) return payload;
+  const whitelist = ANALYTICS_FIELD_WHITELIST[collectionKey];
+  if (!whitelist) return payload;
+
+  if (!payload || typeof payload !== "object") {
+    return payload;
+  }
+
+  if (Array.isArray(payload)) {
+    return filterCollectionRecords(payload as Record<string, unknown>[], collectionKey);
+  }
+
+  const working = { ...(payload as Record<string, unknown>) };
+  const value = working[collectionKey];
+
+  if (Array.isArray(value)) {
+    working[collectionKey] = filterCollectionRecords(
+      value as Record<string, unknown>[],
+      collectionKey,
+    );
+    return working;
+  }
+
+  if (value && typeof value === "object") {
+    working[collectionKey] = filterRecordFields(value as Record<string, unknown>, collectionKey);
+    return working;
+  }
+
+  return working;
 };
 
 export const arrayToCsv = (rows: Record<string, unknown>[]): string => {
@@ -38,6 +93,7 @@ export const arrayToCsv = (rows: Record<string, unknown>[]): string => {
 
 type PrintOptions = {
   collectionKey?: string;
+  skipAnalyticsFilter?: boolean;
 };
 
 const extractRecords = (payload: unknown, collectionKey?: string) => {
@@ -56,16 +112,25 @@ const extractRecords = (payload: unknown, collectionKey?: string) => {
 };
 
 export const renderPayload = (payload: unknown, format: OutputFormat, options?: PrintOptions) => {
+  const applyFilter = Boolean(options?.collectionKey) && !options?.skipAnalyticsFilter;
+  const filteredPayload = applyFilter
+    ? applyAnalyticsFilter(payload, options?.collectionKey)
+    : payload;
+
   if (format === "csv") {
     if (!options?.collectionKey) {
-      return JSON.stringify(payload, null, 2);
+      return JSON.stringify(filteredPayload, null, 2);
     }
 
-    const records = extractRecords(payload, options.collectionKey);
-    return arrayToCsv(records as Record<string, unknown>[]);
+    const records = extractRecords(filteredPayload, options.collectionKey);
+    const filteredRecords =
+      applyFilter && options.collectionKey
+        ? filterCollectionRecords(records as Record<string, unknown>[], options.collectionKey)
+        : (records as Record<string, unknown>[]);
+    return arrayToCsv(filteredRecords as Record<string, unknown>[]);
   }
 
-  return JSON.stringify(payload, null, 2);
+  return JSON.stringify(filteredPayload, null, 2);
 };
 
 export const printPayload = (payload: unknown, format: OutputFormat, options?: PrintOptions) => {
