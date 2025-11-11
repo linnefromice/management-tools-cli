@@ -24,7 +24,9 @@ import {
   searchStoredIssues,
   writeLinearDataset,
 } from "./src/storage";
-import { getUsageText, getLinearUsageText } from "./src/help";
+import { getUsageText, getLinearUsageText, getFigmaUsageText } from "./src/help";
+import { captureFigmaNode, validateFigmaConfig } from "./src/figma";
+import type { FigmaCaptureInput } from "./src/figma/types";
 import { normalizeFormat, printPayload, writePayload } from "./src/output";
 import { logger } from "./src/logger";
 
@@ -36,6 +38,10 @@ const printHelp = () => {
 
 const printLinearHelp = () => {
   console.log(getLinearUsageText());
+};
+
+const printFigmaHelp = () => {
+  console.log(getFigmaUsageText());
 };
 
 const exitWithUsage = (message?: string) => {
@@ -64,7 +70,14 @@ const getFlagValue = (args: string[], flag: string): string | undefined => {
   return undefined;
 };
 
-const flagsRequiringValue = new Set(["--format", "--project", "--label", "--cycle", "--output"]);
+const flagsRequiringValue = new Set([
+  "--format",
+  "--project",
+  "--label",
+  "--cycle",
+  "--output",
+  "--scale",
+]);
 
 const getPositionalArgs = (args: string[]) => {
   const positional: string[] = [];
@@ -377,6 +390,97 @@ const runLinear = async (args: string[]) => {
   }
 };
 
+/**
+ * figma capture コマンドの実行
+ */
+const runFigmaCapture = async (args: string[]) => {
+  // 設定の検証
+  const configCheck = validateFigmaConfig();
+  if (!configCheck.valid) {
+    console.error("Figma configuration is incomplete:");
+    configCheck.errors.forEach((err) => console.error(`  - ${err}`));
+    console.error("\nRefer to README.md for setup instructions.");
+    process.exit(1);
+  }
+
+  // 位置引数の取得（ノードID or URL）
+  const positional = getPositionalArgs(args);
+  const nodeIdOrUrl = positional[0];
+
+  if (!nodeIdOrUrl) {
+    console.error("Usage: cli-name figma capture <node-id-or-url> [options]");
+    console.error("\nOptions:");
+    console.error("  --format <png|jpg>   Image format (default: png)");
+    console.error("  --scale <1-4>        Scale factor (default: 2)");
+    console.error(
+      "  --output <path>      Output file path (default: storage/figma/<node-id>-<timestamp>.<format>)",
+    );
+    process.exit(1);
+  }
+
+  // オプションの解析
+  const formatValue = getFlagValue(args, "format");
+  const format =
+    formatValue === "jpg" ? "jpg" : formatValue === "png" ? "png" : undefined;
+
+  const scaleValue = getFlagValue(args, "scale");
+  const scale = scaleValue ? Number(scaleValue) : undefined;
+  if (scale !== undefined && (scale < 1 || scale > 4 || Number.isNaN(scale))) {
+    console.error("Error: --scale must be a number between 1 and 4");
+    process.exit(1);
+  }
+
+  const outputPath = getFlagValue(args, "output");
+
+  // 入力オブジェクトの構築
+  const input: FigmaCaptureInput = {
+    nodeIdOrUrl,
+    format,
+    scale: scale as 1 | 2 | 3 | 4 | undefined,
+    outputPath,
+  };
+
+  try {
+    console.log(`Capturing Figma node: ${nodeIdOrUrl}...`);
+    const result = await captureFigmaNode(input);
+
+    console.log("\n✓ Capture completed successfully");
+    console.log(`  Node ID:    ${result.nodeId}`);
+    console.log(`  Format:     ${result.format}`);
+    console.log(`  Saved to:   ${result.savedPath}`);
+    console.log(`  Timestamp:  ${result.timestamp}`);
+  } catch (error) {
+    console.error("\n✗ Failed to capture Figma node");
+    if (error instanceof Error) {
+      console.error(`  Error: ${error.message}`);
+    }
+    process.exit(1);
+  }
+};
+
+/**
+ * figma コマンドのルーター
+ */
+const runFigma = async (args: string[]) => {
+  const [subCommand, ...figmaArgs] = args;
+
+  if (!subCommand || subCommand === "help") {
+    printFigmaHelp();
+    if (!subCommand) process.exit(1);
+    return;
+  }
+
+  switch (subCommand) {
+    case "capture":
+      await runFigmaCapture(figmaArgs);
+      break;
+    default:
+      console.error(`Unknown figma subcommand: ${subCommand}`);
+      printFigmaHelp();
+      process.exit(1);
+  }
+};
+
 switch (command) {
   case "greet":
     runGreet();
@@ -386,6 +490,9 @@ switch (command) {
     break;
   case "linear":
     void runLinear(rawArgs);
+    break;
+  case "figma":
+    void runFigma(rawArgs);
     break;
   default:
     exitWithUsage(`Unknown command: ${command}`);

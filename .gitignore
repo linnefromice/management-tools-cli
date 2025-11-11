@@ -33,3 +33,6 @@ storage/
 
 # Finder (MacOS) folder config
 .DS_Store
+
+# Agent/MCP
+.mcp.json
