@@ -99,8 +99,10 @@ bun run index.ts figma capture [node-id-or-url ...] \
 
 - Provide zero or more positional node references (raw IDs like `8802:46326`, dash format `8802-46326`, or full URLs such as `https://www.figma.com/design/<FILE>/<Slug>?node-id=7760-56939&m=dev`). When only using `--ids-file`, omit the positional arguments entirely.
 - Use `--ids-file` to pass a text file (one node ID or URL per line, `#` comments supported). See `examples/figma-node-ids.txt`.
-- The command batches every node into a single `GET /v1/images/<FILE_KEY>?ids=<...>` request, downloads each signed URL, and writes images under `outputs/figma/`.
-- Output filenames follow `${timestamp}_${file-key}-${node-id-with-hyphen}.${format}` (e.g., `2024-02-01T10-30-45_fl5uK43wSluXQiL7vVHjFq-7760-56939.png`). Add `--output` to override the path when capturing a single node.
+- The command batches every node into a single `GET /v1/images/<FILE_KEY>?ids=<...>` request, downloads each signed URL, and writes images under `outputs/figma/<timestamp>/`.
+- Each execution creates a new timestamped folder (e.g., `outputs/figma/2025-11-12T02-01-00-895Z/`).
+- Output filenames follow `figma-design-${file-key}-${node-id-with-hyphen}.${format}` (e.g., `figma-design-fl5uK43wSluXQiL7vVHjFq-7760-56939.png`).
+- Add `--output` to override the path when capturing a single node.
 - `--scale` accepts integers `1-4`; `--format` supports `png` or `jpg`.
 
 ### Sample IDs file
@@ -111,4 +113,19 @@ bun run index.ts figma capture [node-id-or-url ...] \
 https://www.figma.com/design/fl5uK43wSluXQiL7vVHjFq/Project?node-id=7760-56939
 ```
 
-Store this as `examples/figma-node-ids.txt` (or any `.txt`) and pass `--ids-file` (positional arguments optional) to capture both nodes in one run. Images will be saved under `outputs/figma/` with the timestamped naming scheme described above.
+Store this as `examples/figma-node-ids.txt` (or any `.txt`) and pass `--ids-file` (positional arguments optional) to capture both nodes in one run. Images will be saved under `outputs/figma/<timestamp>/` with the naming scheme described above.
+
+### Output structure example
+
+After running `bun run index.ts figma capture --ids-file ./examples/figma-node-ids.txt`, files are organized as:
+
+```
+outputs/
+└── figma/
+    ├── .gitkeep
+    └── 2025-11-12T02-01-00-895Z/
+        ├── figma-design-fl5uK43wSluXQiL7vVHjFq-8802-46326.png
+        └── figma-design-fl5uK43wSluXQiL7vVHjFq-7760-56939.png
+```
+
+Each execution creates a new timestamped folder, keeping captures organized by when they were taken.

@@ -31,7 +31,8 @@ Options:
   --file <key>         Override FIGMA_FILE_KEY for this run
   --format <png|jpg>   Image format (default: png)
   --scale <1-4>        Scale factor for rendering (default: 2)
-  --output <path>      Custom output path (single-node only; default outputs/figma/<timestamp>_<file>-<node>.png)
+  --output <path>      Custom output path (single-node only)
+                       Default: outputs/figma/<timestamp>/figma-design-<file>-<node>.png
 
 Examples:
   # Capture a single node via URL

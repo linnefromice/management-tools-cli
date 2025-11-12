@@ -25,7 +25,12 @@ const buildOutputPath = (
   nodeId: string,
   format: string,
   timestamp: string,
-) => path.join(dir, `${timestamp}_${fileKey}-${hyphenateNodeId(nodeId)}.${format}`);
+) => {
+  // 実行単位ごとにタイムスタンプフォルダを作成
+  const executionDir = path.join(dir, timestamp);
+  const filename = `figma-design-${fileKey}-${hyphenateNodeId(nodeId)}.${format}`;
+  return path.join(executionDir, filename);
+};
 
 export const captureFigmaNodes = async ({
   nodeIds,
@@ -65,8 +70,6 @@ export const captureFigmaNodes = async ({
   const timestamp = formatTimestamp();
   const results: FigmaCaptureResult[] = [];
 
-  await ensureOutputDirectory(outputDir);
-
   for (const nodeId of uniqueNodeIds) {
     const imageUrl = images[nodeId];
     if (!imageUrl) {
@@ -79,6 +82,8 @@ export const captureFigmaNodes = async ({
         ? path.resolve(process.cwd(), outputPath)
         : buildOutputPath(outputDir, fileKeyToUse, nodeId, format, timestamp);
 
+    // ディレクトリが存在しない場合は作成
+    await ensureOutputDirectory(path.dirname(targetPath));
     await fs.writeFile(targetPath, buffer);
 
     results.push({

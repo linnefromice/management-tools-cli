@@ -23,6 +23,11 @@ storage/
 .env.production.local
 .env.local
 
+# outputs (keep directory structure with .gitkeep files)
+outputs/**/*
+!outputs/**/
+!outputs/**/.gitkeep
+
 # caches
 .eslintcache
 .cache
