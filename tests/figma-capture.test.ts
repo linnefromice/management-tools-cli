@@ -28,6 +28,7 @@ describe("parseNodeIdsFromFile", () => {
   const tmpFile = path.resolve("tmp/figma-node-ids.txt");
 
   beforeEach(async () => {
+    process.env.FIGMA_FILE_KEY = "testFileKey";
     await fs.mkdir(path.dirname(tmpFile), { recursive: true });
     await fs.writeFile(
       tmpFile,
@@ -42,6 +43,7 @@ describe("parseNodeIdsFromFile", () => {
   });
 
   afterEach(async () => {
+    resetEnv();
     await fs.rm(path.dirname(tmpFile), { recursive: true, force: true });
   });
 
