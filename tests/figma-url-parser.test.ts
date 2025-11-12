@@ -1,5 +1,10 @@
 import { test, expect, describe } from "bun:test";
-import { parseNodeId, validateNodeId } from "../src/figma/url-parser";
+import {
+  parseNodeId,
+  validateNodeId,
+  parseFileKeyFromUrl,
+  parseNodeEntryFromUrl,
+} from "../src/figma/url-parser";
 
 describe("parseNodeId", () => {
   test("parses node ID from full Figma URL", () => {
@@ -59,5 +64,56 @@ describe("validateNodeId", () => {
 
   test("rejects single number", () => {
     expect(validateNodeId("123")).toBe(false);
+  });
+});
+
+describe("parseFileKeyFromUrl", () => {
+  test("extracts file key from design URL", () => {
+    const url = new URL(
+      "https://www.figma.com/design/fl5uK43wSluXQiL7vVHjFq/Master-UI-Design?node-id=7760-56939&m=dev",
+    );
+    expect(parseFileKeyFromUrl(url)).toBe("fl5uK43wSluXQiL7vVHjFq");
+  });
+
+  test("extracts file key from /file/ URL (legacy format)", () => {
+    const url = new URL("https://www.figma.com/file/xxxxx/YourProject?node-id=123:456");
+    expect(parseFileKeyFromUrl(url)).toBe("xxxxx");
+  });
+
+  test("throws on URL without file key", () => {
+    const url = new URL("https://www.figma.com/design/");
+    expect(() => parseFileKeyFromUrl(url)).toThrow(/Invalid Figma URL format/);
+  });
+
+  test("throws on invalid URL path (not /design/ or /file/)", () => {
+    const url = new URL("https://www.figma.com/invalid/xxxxx/YourProject");
+    expect(() => parseFileKeyFromUrl(url)).toThrow(/Invalid Figma URL format/);
+  });
+});
+
+describe("parseNodeEntryFromUrl", () => {
+  test("extracts both fileKey and nodeId from URL", () => {
+    const url =
+      "https://www.figma.com/design/fl5uK43wSluXQiL7vVHjFq/Master-UI-Design?node-id=7760-56939&m=dev";
+    const result = parseNodeEntryFromUrl(url);
+    expect(result.fileKey).toBe("fl5uK43wSluXQiL7vVHjFq");
+    expect(result.nodeId).toBe("7760:56939");
+  });
+
+  test("handles URL-encoded node-id parameter", () => {
+    const url = "https://www.figma.com/design/testFileKey/ProjectName?node-id=123%3A456&mode=dev";
+    const result = parseNodeEntryFromUrl(url);
+    expect(result.fileKey).toBe("testFileKey");
+    expect(result.nodeId).toBe("123:456");
+  });
+
+  test("throws on URL without node-id parameter", () => {
+    const url = "https://www.figma.com/design/testFileKey/ProjectName";
+    expect(() => parseNodeEntryFromUrl(url)).toThrow(/No node-id parameter found/);
+  });
+
+  test("throws on URL with invalid node-id format", () => {
+    const url = "https://www.figma.com/design/testFileKey/ProjectName?node-id=invalid-format";
+    expect(() => parseNodeEntryFromUrl(url)).toThrow(/Invalid node-id format in URL/);
   });
 });

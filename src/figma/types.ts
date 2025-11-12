@@ -3,7 +3,14 @@ export type FigmaImageFormat = "png" | "jpg";
 export type FigmaScale = 1 | 2 | 3 | 4;
 
 export interface FigmaCaptureOptions {
-  nodeIds: string[];
+  /**
+   * Node entries with fileKey and nodeId pairs (preferred way)
+   */
+  nodeEntries?: FigmaNodeEntry[];
+  /**
+   * @deprecated Use nodeEntries instead. Simple node IDs without explicit file keys.
+   */
+  nodeIds?: string[];
   format?: FigmaImageFormat;
   scale?: FigmaScale;
   /**
@@ -12,7 +19,7 @@ export interface FigmaCaptureOptions {
    */
   outputPath?: string;
   /**
-   * Optional override for the configured Figma file key.
+   * @deprecated Use nodeEntries instead. Optional override for the configured Figma file key.
    */
   fileKey?: string;
   /**
@@ -39,4 +46,31 @@ export interface FigmaConfigCheck {
 export interface FigmaImagesResponse {
   err: string | null;
   images: Record<string, string | null>;
+}
+
+/**
+ * Represents a Figma node with its file key.
+ * Used for JSON-based configuration where each node can have its own file key.
+ */
+export interface FigmaNodeConfig {
+  /**
+   * The Figma file key (required if nodeId is provided)
+   */
+  fileKey?: string;
+  /**
+   * The node ID (e.g., "8802:46326")
+   */
+  nodeId?: string;
+  /**
+   * A full Figma URL (alternative to fileKey + nodeId)
+   */
+  url?: string;
+}
+
+/**
+ * Represents a parsed node entry with both fileKey and nodeId resolved.
+ */
+export interface FigmaNodeEntry {
+  fileKey: string;
+  nodeId: string;
 }
