@@ -10,6 +10,7 @@ import {
 } from "./config";
 import { fetchFigmaImages, downloadImageBuffer } from "./api";
 import { parseNodeId, validateNodeId } from "./url-parser";
+import { logger } from "../logger";
 
 const ensureOutputDirectory = async (dir: string) => {
   await fs.mkdir(dir, { recursive: true });
@@ -40,15 +41,20 @@ export const captureFigmaNodes = async ({
   fileKey,
   outputDir = FIGMA_OUTPUT_DIR,
 }: FigmaCaptureOptions): Promise<FigmaCaptureResult[]> => {
+  logger.info("Starting Figma capture process");
+
   if (!nodeIds.length) {
     throw new Error("No node IDs supplied.");
   }
 
   const uniqueNodeIds = Array.from(new Set(nodeIds));
+  logger.debug(`Unique node IDs (${uniqueNodeIds.length}): ${uniqueNodeIds.join(", ")}`);
+
   const fileKeyToUse = fileKey ?? getFigmaFileKey();
   if (!fileKeyToUse) {
     throw new Error("Figma file key is not configured.");
   }
+  logger.debug(`Using file key: ${fileKeyToUse}`);
 
   if (outputPath && uniqueNodeIds.length > 1) {
     throw new Error("--output can only be used when capturing a single node.");
@@ -60,6 +66,7 @@ export const captureFigmaNodes = async ({
     }
   });
 
+  logger.info(`Fetching image URLs for ${uniqueNodeIds.length} node(s) (format: ${format}, scale: ${scale})`);
   const images = await fetchFigmaImages({
     nodeIds: uniqueNodeIds,
     fileKey: fileKeyToUse,
@@ -73,18 +80,26 @@ export const captureFigmaNodes = async ({
   for (const nodeId of uniqueNodeIds) {
     const imageUrl = images[nodeId];
     if (!imageUrl) {
+      logger.error(`No image URL returned for node ${nodeId}`);
       throw new Error(`Figma did not return an image URL for node ${nodeId}`);
     }
 
+    logger.debug(`Processing node ${nodeId}`);
     const buffer = await downloadImageBuffer(imageUrl);
+
     const targetPath =
       outputPath && uniqueNodeIds.length === 1
         ? path.resolve(process.cwd(), outputPath)
         : buildOutputPath(outputDir, fileKeyToUse, nodeId, format, timestamp);
 
     // ディレクトリが存在しない場合は作成
-    await ensureOutputDirectory(path.dirname(targetPath));
+    const targetDir = path.dirname(targetPath);
+    logger.debug(`Ensuring output directory exists: ${targetDir}`);
+    await ensureOutputDirectory(targetDir);
+
+    logger.info(`Writing file: ${targetPath}`);
     await fs.writeFile(targetPath, buffer);
+    logger.info(`Saved ${nodeId} (${(buffer.length / 1024).toFixed(2)} KB) to ${targetPath}`);
 
     results.push({
       nodeId,
@@ -97,6 +112,7 @@ export const captureFigmaNodes = async ({
     });
   }
 
+  logger.info(`Capture completed: ${results.length} file(s) saved`);
   return results;
 };
 

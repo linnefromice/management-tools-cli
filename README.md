@@ -105,6 +105,35 @@ bun run index.ts figma capture [node-id-or-url ...] \
 - Add `--output` to override the path when capturing a single node.
 - `--scale` accepts integers `1-4`; `--format` supports `png` or `jpg`.
 
+### Logging
+
+The Figma capture command includes detailed logging for API requests and file downloads. Set the `LOG_LEVEL` environment variable to control verbosity:
+
+```bash
+# Default: INFO level (shows API requests, downloads, and file writes)
+bun run index.ts figma capture 8802-46326
+
+# DEBUG level (includes additional details like headers, node IDs, buffer sizes)
+LOG_LEVEL=debug bun run index.ts figma capture 8802-46326
+
+# WARN level (only warnings and errors)
+LOG_LEVEL=warn bun run index.ts figma capture 8802-46326
+```
+
+Available log levels: `debug`, `info` (default), `warn`, `error`.
+
+Example log output (INFO level):
+```
+[2025-11-12T03:26:08.812Z] [INFO] Starting Figma capture process
+[2025-11-12T03:26:08.813Z] [INFO] GET https://api.figma.com/v1/images/...
+[2025-11-12T03:26:09.563Z] [INFO] GET ... - 200 OK (750ms)
+[2025-11-12T03:26:09.564Z] [INFO] Downloading image from https://...
+[2025-11-12T03:26:10.520Z] [INFO] Downloaded image (1273.74 KB) in 956ms
+[2025-11-12T03:26:13.437Z] [INFO] Writing file: /path/to/output.png
+[2025-11-12T03:26:13.443Z] [INFO] Saved 8802:46326 (1273.74 KB) to /path/to/output.png
+[2025-11-12T03:26:13.443Z] [INFO] Capture completed: 1 file(s) saved
+```
+
 ### Sample IDs file
 
 ```
