@@ -25,8 +25,12 @@ import {
   writeLinearDataset,
 } from "./src/storage";
 import { getUsageText, getLinearUsageText, getFigmaUsageText } from "./src/help";
-import { captureFigmaNode, validateFigmaConfig } from "./src/figma";
-import type { FigmaCaptureInput } from "./src/figma/types";
+import {
+  captureFigmaNodes,
+  parseNodeId,
+  parseNodeIdsFromFile,
+  validateFigmaConfig,
+} from "./src/figma";
 import { normalizeFormat, printPayload, writePayload } from "./src/output";
 import { logger } from "./src/logger";
 
@@ -77,6 +81,8 @@ const flagsRequiringValue = new Set([
   "--cycle",
   "--output",
   "--scale",
+  "--ids-file",
+  "--file",
 ]);
 
 const getPositionalArgs = (args: string[]) => {
@@ -394,7 +400,6 @@ const runLinear = async (args: string[]) => {
  * figma capture コマンドの実行
  */
 const runFigmaCapture = async (args: string[]) => {
-  // 設定の検証
   const configCheck = validateFigmaConfig();
   if (!configCheck.valid) {
     console.error("Figma configuration is incomplete:");
@@ -403,57 +408,80 @@ const runFigmaCapture = async (args: string[]) => {
     process.exit(1);
   }
 
-  // 位置引数の取得（ノードID or URL）
   const positional = getPositionalArgs(args);
-  const nodeIdOrUrl = positional[0];
+  const idsFilePath = getFlagValue(args, "ids-file");
 
-  if (!nodeIdOrUrl) {
-    console.error("Usage: cli-name figma capture <node-id-or-url> [options]");
-    console.error("\nOptions:");
-    console.error("  --format <png|jpg>   Image format (default: png)");
-    console.error("  --scale <1-4>        Scale factor (default: 2)");
-    console.error(
-      "  --output <path>      Output file path (default: storage/figma/<node-id>-<timestamp>.<format>)",
-    );
+  if (!positional.length && !idsFilePath) {
+    printFigmaHelp();
     process.exit(1);
   }
 
-  // オプションの解析
   const formatValue = getFlagValue(args, "format");
-  const format =
-    formatValue === "jpg" ? "jpg" : formatValue === "png" ? "png" : undefined;
+  const acceptedFormats = new Set(["png", "jpg"]);
+  if (formatValue && !acceptedFormats.has(formatValue)) {
+    console.error('Error: --format must be either "png" or "jpg".');
+    process.exit(1);
+  }
+  const format = formatValue as "png" | "jpg" | undefined;
 
   const scaleValue = getFlagValue(args, "scale");
-  const scale = scaleValue ? Number(scaleValue) : undefined;
-  if (scale !== undefined && (scale < 1 || scale > 4 || Number.isNaN(scale))) {
-    console.error("Error: --scale must be a number between 1 and 4");
-    process.exit(1);
+  let scale: 1 | 2 | 3 | 4 | undefined;
+  if (scaleValue !== undefined) {
+    const parsedScale = Number(scaleValue);
+    if (!Number.isInteger(parsedScale) || parsedScale < 1 || parsedScale > 4) {
+      console.error("Error: --scale must be an integer between 1 and 4.");
+      process.exit(1);
+    }
+    scale = parsedScale as 1 | 2 | 3 | 4;
   }
 
   const outputPath = getFlagValue(args, "output");
+  const fileKeyOverride = getFlagValue(args, "file");
 
-  // 入力オブジェクトの構築
-  const input: FigmaCaptureInput = {
-    nodeIdOrUrl,
-    format,
-    scale: scale as 1 | 2 | 3 | 4 | undefined,
-    outputPath,
-  };
+  let fileNodeIds: string[] = [];
+  if (idsFilePath) {
+    try {
+      fileNodeIds = await parseNodeIdsFromFile(idsFilePath);
+    } catch (error) {
+      console.error(`Failed to load IDs from "${idsFilePath}"`);
+      if (error instanceof Error) console.error(error.message);
+      process.exit(1);
+    }
+  }
+
+  let directNodeIds: string[] = [];
+  try {
+    directNodeIds = positional.map((value) => parseNodeId(value));
+  } catch (error) {
+    console.error("Failed to parse node ID input.");
+    if (error instanceof Error) console.error(error.message);
+    process.exit(1);
+  }
+
+  const nodeIds = [...new Set([...directNodeIds, ...fileNodeIds])];
+  if (!nodeIds.length) {
+    console.error("No valid node IDs were provided.");
+    process.exit(1);
+  }
 
   try {
-    console.log(`Capturing Figma node: ${nodeIdOrUrl}...`);
-    const result = await captureFigmaNode(input);
+    console.log(`Capturing ${nodeIds.length} Figma node(s)...`);
+    const results = await captureFigmaNodes({
+      nodeIds,
+      format,
+      scale,
+      outputPath,
+      fileKey: fileKeyOverride,
+    });
 
-    console.log("\n✓ Capture completed successfully");
-    console.log(`  Node ID:    ${result.nodeId}`);
-    console.log(`  Format:     ${result.format}`);
-    console.log(`  Saved to:   ${result.savedPath}`);
-    console.log(`  Timestamp:  ${result.timestamp}`);
+    console.log("");
+    results.forEach((result) => {
+      console.log(`✓ ${result.nodeId} (${result.format}) -> ${result.savedPath}`);
+    });
+    console.log(`\nSaved ${results.length} file(s). Timestamp: ${results[0]?.timestamp}`);
   } catch (error) {
-    console.error("\n✗ Failed to capture Figma node");
-    if (error instanceof Error) {
-      console.error(`  Error: ${error.message}`);
-    }
+    console.error("Failed to capture Figma nodes.");
+    if (error instanceof Error) console.error(error.message);
     process.exit(1);
   }
 };

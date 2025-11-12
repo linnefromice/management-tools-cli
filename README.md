@@ -23,6 +23,17 @@ LINEAR_WORKSPACE_ID=<workspace-uuid>
 
 These are required for `linear-projects` to authenticate against the correct workspace via the Linear SDK.
 
+For the new Figma capture workflow also set:
+
+```env
+FIGMA_ACCESS_TOKEN=figd_xxx
+FIGMA_FILE_KEY=fl5uK43wSluXQiL7vVHjFq
+# Optional override (defaults to https://api.figma.com)
+FIGMA_API_BASE_URL=https://api.figma.com
+```
+
+`FIGMA_ACCESS_TOKEN` must have the “File export” scope. `FIGMA_FILE_KEY` is the file ID segment in your Figma URL (`https://www.figma.com/file/<FILE_KEY>/...`).
+
 ## Linear commands
 
 After configuring env vars you can inspect Linear data via subcommands:
@@ -71,3 +82,33 @@ bun run typecheck
 CI-style scripts ensure the CLI, storage helpers, and output utilities behave consistently before sharing data with downstream automation.
 
 This project was created using `bun init` in bun v1.3.1. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+
+## Figma capture workflow
+
+Use the Figma REST API to download rendered node images directly from the CLI.
+
+```bash
+bun run index.ts figma capture [node-id-or-url ...] \
+  [--ids-file ./figma-node-ids.txt] \
+  [--scale 2] \
+  [--format png] \
+  [--file <override-file-key>] \
+  [--output ./custom/path.png]
+```
+```
+
+- Provide zero or more positional node references (raw IDs like `8802:46326`, dash format `8802-46326`, or full URLs such as `https://www.figma.com/design/<FILE>/<Slug>?node-id=7760-56939&m=dev`). When only using `--ids-file`, omit the positional arguments entirely.
+- Use `--ids-file` to pass a text file (one node ID or URL per line, `#` comments supported). See `examples/figma-node-ids.txt`.
+- The command batches every node into a single `GET /v1/images/<FILE_KEY>?ids=<...>` request, downloads each signed URL, and writes images under `outputs/figma/`.
+- Output filenames follow `${timestamp}_${file-key}-${node-id-with-hyphen}.${format}` (e.g., `2024-02-01T10-30-45_fl5uK43wSluXQiL7vVHjFq-7760-56939.png`). Add `--output` to override the path when capturing a single node.
+- `--scale` accepts integers `1-4`; `--format` supports `png` or `jpg`.
+
+### Sample IDs file
+
+```
+# ios onboarding flows
+8802:46326
+https://www.figma.com/design/fl5uK43wSluXQiL7vVHjFq/Project?node-id=7760-56939
+```
+
+Store this as `examples/figma-node-ids.txt` (or any `.txt`) and pass `--ids-file` (positional arguments optional) to capture both nodes in one run. Images will be saved under `outputs/figma/` with the timestamped naming scheme described above.

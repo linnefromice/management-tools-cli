@@ -10,7 +10,7 @@ export const getUsageText = () => `Usage:
   cli-name linear cycles [--format csv] [--remote] [--output <PATH>] [--all-fields]
   cli-name linear search-issues [--project <ID>] [--label <ID>] [--cycle <ID>] [--format csv] [--output <PATH>] [--all-fields]
   cli-name linear sync
-  cli-name figma capture <node-id-or-url> [--format png|jpg] [--scale 1-4] [--output <PATH>]`;
+  cli-name figma capture [node-id-or-url ...] [--ids-file <PATH>] [--format png|jpg] [--scale 1-4] [--output <PATH>] [--file <KEY>]`;
 
 export const getLinearUsageText = () => `Linear commands:
   cli-name linear projects [--full] [--format csv] [--remote] [--output <PATH>] [--all-fields]
@@ -24,29 +24,29 @@ export const getLinearUsageText = () => `Linear commands:
   cli-name linear sync`;
 
 export const getFigmaUsageText = () => `Figma commands:
-  cli-name figma capture <node-id-or-url> [options]
+  cli-name figma capture [node-id-or-url ...] [options]
 
 Options:
+  --ids-file <path>    Text file listing node IDs/URLs (one per line); omit positional args when using this
+  --file <key>         Override FIGMA_FILE_KEY for this run
   --format <png|jpg>   Image format (default: png)
   --scale <1-4>        Scale factor for rendering (default: 2)
-  --output <path>      Custom output file path
+  --output <path>      Custom output path (single-node only; default outputs/figma/<timestamp>_<file>-<node>.png)
 
 Examples:
-  # Capture using full Figma URL
-  cli-name figma capture "https://www.figma.com/file/xxxxx/YourProject?node-id=123%3A456"
+  # Capture a single node via URL
+  cli-name figma capture "https://www.figma.com/design/<FILE>/<Slug>?node-id=123%3A456"
 
-  # Capture using node ID only
+  # Capture a single node via node ID
   cli-name figma capture "123:456"
+
+  # Capture multiple nodes defined in a text file (no positional arguments needed)
+  cli-name figma capture --ids-file ./figma-node-ids.txt
 
   # Custom format and scale
   cli-name figma capture "123:456" --format jpg --scale 4
 
-  # Custom output path
-  cli-name figma capture "123:456" --output ./designs/my-capture.png
-
 Setup:
-  1. Install @figma/mcp-server: npm install -g @figma/mcp-server
-  2. Start the MCP server with your Figma access token:
-     FIGMA_ACCESS_TOKEN=<your-token> FIGMA_FILE_KEY=<your-file-key> figma-mcp-server
-  3. (Optional) Set FIGMA_MCP_ENDPOINT in .env if using a custom endpoint
-     - FIGMA_MCP_ENDPOINT (default: http://localhost:4001)`;
+  1. Create a Figma Personal Access Token with file export scope.
+  2. Set FIGMA_ACCESS_TOKEN and FIGMA_FILE_KEY in your environment or .env file.
+  3. Run the CLI command; images will be saved under outputs/figma by default.`;

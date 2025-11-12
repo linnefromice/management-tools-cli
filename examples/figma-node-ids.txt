@@ -1,0 +1,5 @@
+# Example node list for cli-name figma capture --ids-file ./examples/figma-node-ids.txt
+# Lines starting with # are ignored.
+
+8802:46326
+https://www.figma.com/design/fl5uK43wSluXQiL7vVHjFq/%E3%80%90Master%E3%80%91UI-Design?node-id=7760-56939&m=dev

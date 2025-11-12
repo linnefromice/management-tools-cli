@@ -1,60 +1,42 @@
-// MCP JSON-RPC リクエスト型
-export type McpRequest = {
-  jsonrpc: "2.0";
-  id: number;
-  method: "tools/call";
-  params: {
-    tool: "get_image";
-    arguments: {
-      node_ids: string[];
-      format?: "png" | "jpg";
-      scale?: number;
-    };
-  };
-};
+export type FigmaImageFormat = "png" | "jpg";
 
-// MCP JSON-RPC レスポンス型
-export type McpResponse = {
-  jsonrpc: "2.0";
-  id: number;
-  result?: {
-    format: string;
-    node_id: string;
-    image: string; // data:image/png;base64,iVBOR...
-  };
-  error?: {
-    code: number;
-    message: string;
-    data?: unknown;
-  };
-};
+export type FigmaScale = 1 | 2 | 3 | 4;
 
-// Figma キャプチャ入力型
-export type FigmaCaptureInput = {
-  nodeIdOrUrl: string;
-  format?: "png" | "jpg";
-  scale?: 1 | 2 | 3 | 4;
+export interface FigmaCaptureOptions {
+  nodeIds: string[];
+  format?: FigmaImageFormat;
+  scale?: FigmaScale;
+  /**
+   * When provided (and only one node is requested) the CLI will write to this path
+   * instead of the default `outputs/figma/...` location.
+   */
   outputPath?: string;
-};
+  /**
+   * Optional override for the configured Figma file key.
+   */
+  fileKey?: string;
+  /**
+   * Override for the base output directory. Defaults to `outputs/figma`.
+   */
+  outputDir?: string;
+}
 
-// Figma キャプチャ結果型
-export type FigmaCaptureResult = {
+export interface FigmaCaptureResult {
   nodeId: string;
-  format: "png" | "jpg";
+  fileKey: string;
+  format: FigmaImageFormat;
+  scale: FigmaScale;
   savedPath: string;
-  source: "mcp-server";
   timestamp: string;
-  base64Length: number;
-};
+  imageUrl: string;
+}
 
-// Figma エラー型
-export class FigmaMcpError extends Error {
-  constructor(
-    public code: number,
-    message: string,
-    public data?: unknown,
-  ) {
-    super(`Figma MCP Error [${code}]: ${message}`);
-    this.name = "FigmaMcpError";
-  }
+export interface FigmaConfigCheck {
+  valid: boolean;
+  errors: string[];
+}
+
+export interface FigmaImagesResponse {
+  err: string | null;
+  images: Record<string, string | null>;
 }

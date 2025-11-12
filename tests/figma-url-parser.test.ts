@@ -16,6 +16,10 @@ describe("parseNodeId", () => {
     expect(parseNodeId("123%3A456")).toBe("123:456");
   });
 
+  test("handles dash formatted node ID", () => {
+    expect(parseNodeId("123-456")).toBe("123:456");
+  });
+
   test("throws on invalid node ID format", () => {
     expect(() => parseNodeId("invalid")).toThrow(/Invalid node ID format/);
   });
@@ -43,8 +47,8 @@ describe("validateNodeId", () => {
     expect(validateNodeId("123:456")).toBe(true);
   });
 
-  test("rejects invalid format with dash", () => {
-    expect(validateNodeId("123-456")).toBe(false);
+  test("accepts dash separated node ID", () => {
+    expect(validateNodeId("123-456")).toBe(true);
   });
 
   test("rejects text-only input", () => {
