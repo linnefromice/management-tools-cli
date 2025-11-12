@@ -1,11 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import {
-  captureFigmaNodes,
-  parseNodeIdsFromFile,
-  validateFigmaConfig,
-} from "../src/figma";
+import { captureFigmaNodes, parseNodeIdsFromFile, validateFigmaConfig } from "../src/figma";
 
 const ORIGINAL_ENV = {
   FIGMA_FILE_KEY: process.env.FIGMA_FILE_KEY,
@@ -67,30 +63,35 @@ describe("captureFigmaNodes", () => {
       "789:012": "https://figma.example/image-b.png",
     };
 
-    globalThis.fetch = async (input: RequestInfo | URL) => {
-      const url =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-          ? input.toString()
-          : input.url;
+    type FetchInput = Parameters<typeof fetch>[0];
+    type FetchInit = Parameters<typeof fetch>[1];
 
-      if (url.includes("/v1/images/")) {
-        return new Response(
-          JSON.stringify({
-            err: null,
-            images: imageMap,
-          }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
-      }
+    const mockFetch = Object.assign(
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      async (input: FetchInput, _init?: FetchInit) => {
+        const url =
+          typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
 
-      if (url.startsWith("https://figma.example/")) {
-        return new Response("fake-binary", { status: 200 });
-      }
+        if (url.includes("/v1/images/")) {
+          return new Response(
+            JSON.stringify({
+              err: null,
+              images: imageMap,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
 
-      return new Response("not found", { status: 404 });
-    };
+        if (url.startsWith("https://figma.example/")) {
+          return new Response("fake-binary", { status: 200 });
+        }
+
+        return new Response("not found", { status: 404 });
+      },
+      { preconnect: () => Promise.resolve() },
+    );
+
+    globalThis.fetch = mockFetch as typeof fetch;
   });
 
   afterEach(async () => {

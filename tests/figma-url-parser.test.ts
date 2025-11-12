@@ -3,8 +3,7 @@ import { parseNodeId, validateNodeId } from "../src/figma/url-parser";
 
 describe("parseNodeId", () => {
   test("parses node ID from full Figma URL", () => {
-    const url =
-      "https://www.figma.com/file/xxxxx/YourProject?node-id=123%3A456";
+    const url = "https://www.figma.com/file/xxxxx/YourProject?node-id=123%3A456";
     expect(parseNodeId(url)).toBe("123:456");
   });
 
@@ -36,8 +35,7 @@ describe("parseNodeId", () => {
   });
 
   test("throws on malformed node-id in URL", () => {
-    const url =
-      "https://www.figma.com/file/xxxxx/YourProject?node-id=invalid-format";
+    const url = "https://www.figma.com/file/xxxxx/YourProject?node-id=invalid-format";
     expect(() => parseNodeId(url)).toThrow(/Invalid node-id format in URL/);
   });
 });

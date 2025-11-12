@@ -66,7 +66,9 @@ export const captureFigmaNodes = async ({
     }
   });
 
-  logger.info(`Fetching image URLs for ${uniqueNodeIds.length} node(s) (format: ${format}, scale: ${scale})`);
+  logger.info(
+    `Fetching image URLs for ${uniqueNodeIds.length} node(s) (format: ${format}, scale: ${scale})`,
+  );
   const images = await fetchFigmaImages({
     nodeIds: uniqueNodeIds,
     fileKey: fileKeyToUse,

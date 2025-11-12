@@ -102,5 +102,4 @@ export const ANALYTICS_FIELD_WHITELIST: Record<string, readonly string[]> = {
 };
 
 // Figma MCP Server 設定
-export const FIGMA_MCP_ENDPOINT =
-  process.env.FIGMA_MCP_ENDPOINT ?? "http://localhost:4001";
+export const FIGMA_MCP_ENDPOINT = process.env.FIGMA_MCP_ENDPOINT ?? "http://localhost:4001";

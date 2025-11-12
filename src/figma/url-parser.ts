@@ -2,7 +2,6 @@ const NODE_ID_PATTERN = /^[0-9]+(?::|-)[0-9]+$/;
 
 const isProbablyUrl = (value: string) => {
   try {
-    // eslint-disable-next-line no-new
     new URL(value);
     return true;
   } catch {

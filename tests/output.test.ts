@@ -97,8 +97,9 @@ describe("analytics field filtering", () => {
     };
 
     const rendered = renderPayload(payload, "csv", { collectionKey: "issues" });
-    const [headerLine] = rendered.split("\n");
+    const [headerLine = ""] = rendered.split("\n");
 
+    expect(headerLine).not.toBe("");
     expect(headerLine.split(",")).toEqual(["identifier", "title", "description"]);
     expect(rendered.includes("project-1")).toBe(false);
     expect(rendered.includes("issue-1")).toBe(false);

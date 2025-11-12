@@ -38,17 +38,17 @@ FIGMA_API_BASE_URL=https://api.figma.com
 
 After configuring env vars you can inspect Linear data via subcommands:
 
-| Command                                 | Description                                                                                                         | Useful flags                                                                                                                                       |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Command                                 | Description                                                                                                         | Useful flags                                                                                                                                         |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bun run index.ts linear projects`      | List projects from local cache by default                                                                           | `--full` (raw payload), `--format csv`, `--remote` (refresh cache via API), `--output [path]`, `--all-fields` (emit every attribute, skip filtering) |
-| `bun run index.ts linear teams`         | List teams                                                                                                          | `--full`, `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                            |
-| `bun run index.ts linear issue <KEY>`   | Retrieve a single issue (from local storage) by key such as `CORE-123`                                              | `--format csv`, `--output [path]`, `--all-fields`                                                                                                  |
-| `bun run index.ts linear issues`        | List issues from cache                                                                                              | `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                                       |
-| `bun run index.ts linear users`         | List members                                                                                                        | `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                                       |
-| `bun run index.ts linear labels`        | List issue labels                                                                                                   | `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                                       |
-| `bun run index.ts linear cycles`        | List cycles                                                                                                         | `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                                       |
-| `bun run index.ts linear search-issues` | Query issues already synced to disk                                                                                 | `--project <id>`, `--label <id>`, `--cycle <id>`, `--format csv`, `--output [path]`, `--all-fields`                                                 |
-| `bun run index.ts linear sync`          | Download teams, projects, issues, users, labels, cycles and store them under `storage/linear/` for offline analysis | —                                                                                             |
+| `bun run index.ts linear teams`         | List teams                                                                                                          | `--full`, `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                              |
+| `bun run index.ts linear issue <KEY>`   | Retrieve a single issue (from local storage) by key such as `CORE-123`                                              | `--format csv`, `--output [path]`, `--all-fields`                                                                                                    |
+| `bun run index.ts linear issues`        | List issues from cache                                                                                              | `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                                        |
+| `bun run index.ts linear users`         | List members                                                                                                        | `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                                        |
+| `bun run index.ts linear labels`        | List issue labels                                                                                                   | `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                                        |
+| `bun run index.ts linear cycles`        | List cycles                                                                                                         | `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                                        |
+| `bun run index.ts linear search-issues` | Query issues already synced to disk                                                                                 | `--project <id>`, `--label <id>`, `--cycle <id>`, `--format csv`, `--output [path]`, `--all-fields`                                                  |
+| `bun run index.ts linear sync`          | Download teams, projects, issues, users, labels, cycles and store them under `storage/linear/` for offline analysis | —                                                                                                                                                    |
 
 > ヒント: `--remote` を付けると対象データを Linear API から再取得し、ローカルの `storage/linear/*.json` も自動更新します。指定しない場合は最新のローカルキャッシュを読み込みます。
 
@@ -95,7 +95,8 @@ bun run index.ts figma capture [node-id-or-url ...] \
   [--file <override-file-key>] \
   [--output ./custom/path.png]
 ```
-```
+
+````
 
 - Provide zero or more positional node references (raw IDs like `8802:46326`, dash format `8802-46326`, or full URLs such as `https://www.figma.com/design/<FILE>/<Slug>?node-id=7760-56939&m=dev`). When only using `--ids-file`, omit the positional arguments entirely.
 - Use `--ids-file` to pass a text file (one node ID or URL per line, `#` comments supported). See `examples/figma-node-ids.txt`.
@@ -118,11 +119,12 @@ LOG_LEVEL=debug bun run index.ts figma capture 8802-46326
 
 # WARN level (only warnings and errors)
 LOG_LEVEL=warn bun run index.ts figma capture 8802-46326
-```
+````
 
 Available log levels: `debug`, `info` (default), `warn`, `error`.
 
 Example log output (INFO level):
+
 ```
 [2025-11-12T03:26:08.812Z] [INFO] Starting Figma capture process
 [2025-11-12T03:26:08.813Z] [INFO] GET https://api.figma.com/v1/images/...
