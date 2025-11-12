@@ -152,10 +152,7 @@ const normalizeIssueRecord = (issue: Issue | LinearIssueFull): LinearIssueFull =
   plain.cycleId = ensureId(plain.cycleId, () => source.cycleId ?? plain._cycle?.id);
   plain.teamId = ensureId(plain.teamId, () => source.teamId ?? plain._team?.id);
   plain.stateId = ensureId(plain.stateId, () => source.stateId ?? plain._state?.id);
-  plain.assigneeId = ensureId(
-    plain.assigneeId,
-    () => source.assigneeId ?? plain._assignee?.id,
-  );
+  plain.assigneeId = ensureId(plain.assigneeId, () => source.assigneeId ?? plain._assignee?.id);
 
   if (!Array.isArray(plain.labelIds) && Array.isArray(source.labelIds)) {
     plain.labelIds = source.labelIds;

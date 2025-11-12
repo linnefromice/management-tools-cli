@@ -53,8 +53,7 @@ type StoredIssueRecord = LinearIssueFull & {
 const resolveProjectId = (issue: StoredIssueRecord) =>
   issue.projectId ?? issue._project?.id ?? undefined;
 
-const resolveCycleId = (issue: StoredIssueRecord) =>
-  issue.cycleId ?? issue._cycle?.id ?? undefined;
+const resolveCycleId = (issue: StoredIssueRecord) => issue.cycleId ?? issue._cycle?.id ?? undefined;
 
 const resolveLabelIds = (issue: StoredIssueRecord) => issue.labelIds ?? [];
 

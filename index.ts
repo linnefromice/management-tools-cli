@@ -24,7 +24,13 @@ import {
   searchStoredIssues,
   writeLinearDataset,
 } from "./src/storage";
-import { getUsageText, getLinearUsageText } from "./src/help";
+import { getUsageText, getLinearUsageText, getFigmaUsageText } from "./src/help";
+import {
+  captureFigmaNodes,
+  parseNodeId,
+  parseNodeIdsFromFile,
+  validateFigmaConfig,
+} from "./src/figma";
 import { normalizeFormat, printPayload, writePayload } from "./src/output";
 import { logger } from "./src/logger";
 
@@ -36,6 +42,10 @@ const printHelp = () => {
 
 const printLinearHelp = () => {
   console.log(getLinearUsageText());
+};
+
+const printFigmaHelp = () => {
+  console.log(getFigmaUsageText());
 };
 
 const exitWithUsage = (message?: string) => {
@@ -64,7 +74,16 @@ const getFlagValue = (args: string[], flag: string): string | undefined => {
   return undefined;
 };
 
-const flagsRequiringValue = new Set(["--format", "--project", "--label", "--cycle", "--output"]);
+const flagsRequiringValue = new Set([
+  "--format",
+  "--project",
+  "--label",
+  "--cycle",
+  "--output",
+  "--scale",
+  "--ids-file",
+  "--file",
+]);
 
 const getPositionalArgs = (args: string[]) => {
   const positional: string[] = [];
@@ -377,6 +396,119 @@ const runLinear = async (args: string[]) => {
   }
 };
 
+/**
+ * figma capture コマンドの実行
+ */
+const runFigmaCapture = async (args: string[]) => {
+  const configCheck = validateFigmaConfig();
+  if (!configCheck.valid) {
+    console.error("Figma configuration is incomplete:");
+    configCheck.errors.forEach((err) => console.error(`  - ${err}`));
+    console.error("\nRefer to README.md for setup instructions.");
+    process.exit(1);
+  }
+
+  const positional = getPositionalArgs(args);
+  const idsFilePath = getFlagValue(args, "ids-file");
+
+  if (!positional.length && !idsFilePath) {
+    printFigmaHelp();
+    process.exit(1);
+  }
+
+  const formatValue = getFlagValue(args, "format");
+  const acceptedFormats = new Set(["png", "jpg"]);
+  if (formatValue && !acceptedFormats.has(formatValue)) {
+    console.error('Error: --format must be either "png" or "jpg".');
+    process.exit(1);
+  }
+  const format = formatValue as "png" | "jpg" | undefined;
+
+  const scaleValue = getFlagValue(args, "scale");
+  let scale: 1 | 2 | 3 | 4 | undefined;
+  if (scaleValue !== undefined) {
+    const parsedScale = Number(scaleValue);
+    if (!Number.isInteger(parsedScale) || parsedScale < 1 || parsedScale > 4) {
+      console.error("Error: --scale must be an integer between 1 and 4.");
+      process.exit(1);
+    }
+    scale = parsedScale as 1 | 2 | 3 | 4;
+  }
+
+  const outputPath = getFlagValue(args, "output");
+  const fileKeyOverride = getFlagValue(args, "file");
+
+  let fileNodeIds: string[] = [];
+  if (idsFilePath) {
+    try {
+      fileNodeIds = await parseNodeIdsFromFile(idsFilePath);
+    } catch (error) {
+      console.error(`Failed to load IDs from "${idsFilePath}"`);
+      if (error instanceof Error) console.error(error.message);
+      process.exit(1);
+    }
+  }
+
+  let directNodeIds: string[] = [];
+  try {
+    directNodeIds = positional.map((value) => parseNodeId(value));
+  } catch (error) {
+    console.error("Failed to parse node ID input.");
+    if (error instanceof Error) console.error(error.message);
+    process.exit(1);
+  }
+
+  const nodeIds = [...new Set([...directNodeIds, ...fileNodeIds])];
+  if (!nodeIds.length) {
+    console.error("No valid node IDs were provided.");
+    process.exit(1);
+  }
+
+  try {
+    console.log(`Capturing ${nodeIds.length} Figma node(s)...`);
+    const results = await captureFigmaNodes({
+      nodeIds,
+      format,
+      scale,
+      outputPath,
+      fileKey: fileKeyOverride,
+    });
+
+    console.log("");
+    results.forEach((result) => {
+      console.log(`✓ ${result.nodeId} (${result.format}) -> ${result.savedPath}`);
+    });
+    console.log(`\nSaved ${results.length} file(s). Timestamp: ${results[0]?.timestamp}`);
+  } catch (error) {
+    console.error("Failed to capture Figma nodes.");
+    if (error instanceof Error) console.error(error.message);
+    process.exit(1);
+  }
+};
+
+/**
+ * figma コマンドのルーター
+ */
+const runFigma = async (args: string[]) => {
+  const [subCommand, ...figmaArgs] = args;
+
+  if (!subCommand || subCommand === "help") {
+    printFigmaHelp();
+    if (!subCommand) process.exit(1);
+    return;
+  }
+
+  switch (subCommand) {
+    case "capture":
+      await runFigmaCapture(figmaArgs);
+      break;
+    default:
+      console.error(`Unknown figma subcommand: ${subCommand}`);
+      printFigmaHelp();
+      process.exit(1);
+  }
+};
+
 switch (command) {
   case "greet":
     runGreet();
@@ -386,6 +518,9 @@ switch (command) {
     break;
   case "linear":
     void runLinear(rawArgs);
+    break;
+  case "figma":
+    void runFigma(rawArgs);
     break;
   default:
     exitWithUsage(`Unknown command: ${command}`);

@@ -23,21 +23,32 @@ LINEAR_WORKSPACE_ID=<workspace-uuid>
 
 These are required for `linear-projects` to authenticate against the correct workspace via the Linear SDK.
 
+For the new Figma capture workflow also set:
+
+```env
+FIGMA_ACCESS_TOKEN=figd_xxx
+FIGMA_FILE_KEY=fl5uK43wSluXQiL7vVHjFq
+# Optional override (defaults to https://api.figma.com)
+FIGMA_API_BASE_URL=https://api.figma.com
+```
+
+`FIGMA_ACCESS_TOKEN` must have the “File export” scope. `FIGMA_FILE_KEY` is the file ID segment in your Figma URL (`https://www.figma.com/file/<FILE_KEY>/...`).
+
 ## Linear commands
 
 After configuring env vars you can inspect Linear data via subcommands:
 
-| Command                                 | Description                                                                                                         | Useful flags                                                                                                                                       |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Command                                 | Description                                                                                                         | Useful flags                                                                                                                                         |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bun run index.ts linear projects`      | List projects from local cache by default                                                                           | `--full` (raw payload), `--format csv`, `--remote` (refresh cache via API), `--output [path]`, `--all-fields` (emit every attribute, skip filtering) |
-| `bun run index.ts linear teams`         | List teams                                                                                                          | `--full`, `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                            |
-| `bun run index.ts linear issue <KEY>`   | Retrieve a single issue (from local storage) by key such as `CORE-123`                                              | `--format csv`, `--output [path]`, `--all-fields`                                                                                                  |
-| `bun run index.ts linear issues`        | List issues from cache                                                                                              | `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                                       |
-| `bun run index.ts linear users`         | List members                                                                                                        | `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                                       |
-| `bun run index.ts linear labels`        | List issue labels                                                                                                   | `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                                       |
-| `bun run index.ts linear cycles`        | List cycles                                                                                                         | `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                                       |
-| `bun run index.ts linear search-issues` | Query issues already synced to disk                                                                                 | `--project <id>`, `--label <id>`, `--cycle <id>`, `--format csv`, `--output [path]`, `--all-fields`                                                 |
-| `bun run index.ts linear sync`          | Download teams, projects, issues, users, labels, cycles and store them under `storage/linear/` for offline analysis | —                                                                                             |
+| `bun run index.ts linear teams`         | List teams                                                                                                          | `--full`, `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                              |
+| `bun run index.ts linear issue <KEY>`   | Retrieve a single issue (from local storage) by key such as `CORE-123`                                              | `--format csv`, `--output [path]`, `--all-fields`                                                                                                    |
+| `bun run index.ts linear issues`        | List issues from cache                                                                                              | `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                                        |
+| `bun run index.ts linear users`         | List members                                                                                                        | `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                                        |
+| `bun run index.ts linear labels`        | List issue labels                                                                                                   | `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                                        |
+| `bun run index.ts linear cycles`        | List cycles                                                                                                         | `--format csv`, `--remote`, `--output [path]`, `--all-fields`                                                                                        |
+| `bun run index.ts linear search-issues` | Query issues already synced to disk                                                                                 | `--project <id>`, `--label <id>`, `--cycle <id>`, `--format csv`, `--output [path]`, `--all-fields`                                                  |
+| `bun run index.ts linear sync`          | Download teams, projects, issues, users, labels, cycles and store them under `storage/linear/` for offline analysis | —                                                                                                                                                    |
 
 > ヒント: `--remote` を付けると対象データを Linear API から再取得し、ローカルの `storage/linear/*.json` も自動更新します。指定しない場合は最新のローカルキャッシュを読み込みます。
 
@@ -71,3 +82,81 @@ bun run typecheck
 CI-style scripts ensure the CLI, storage helpers, and output utilities behave consistently before sharing data with downstream automation.
 
 This project was created using `bun init` in bun v1.3.1. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+
+## Figma capture workflow
+
+Use the Figma REST API to download rendered node images directly from the CLI.
+
+```bash
+bun run index.ts figma capture [node-id-or-url ...] \
+  [--ids-file ./figma-node-ids.txt] \
+  [--scale 2] \
+  [--format png] \
+  [--file <override-file-key>] \
+  [--output ./custom/path.png]
+```
+
+````
+
+- Provide zero or more positional node references (raw IDs like `8802:46326`, dash format `8802-46326`, or full URLs such as `https://www.figma.com/design/<FILE>/<Slug>?node-id=7760-56939&m=dev`). When only using `--ids-file`, omit the positional arguments entirely.
+- Use `--ids-file` to pass a text file (one node ID or URL per line, `#` comments supported). See `examples/figma-node-ids.txt`.
+- The command batches every node into a single `GET /v1/images/<FILE_KEY>?ids=<...>` request, downloads each signed URL, and writes images under `outputs/figma/<timestamp>/`.
+- Each execution creates a new timestamped folder (e.g., `outputs/figma/2025-11-12T02-01-00-895Z/`).
+- Output filenames follow `figma-design-${file-key}-${node-id-with-hyphen}.${format}` (e.g., `figma-design-fl5uK43wSluXQiL7vVHjFq-7760-56939.png`).
+- Add `--output` to override the path when capturing a single node.
+- `--scale` accepts integers `1-4`; `--format` supports `png` or `jpg`.
+
+### Logging
+
+The Figma capture command includes detailed logging for API requests and file downloads. Set the `LOG_LEVEL` environment variable to control verbosity:
+
+```bash
+# Default: INFO level (shows API requests, downloads, and file writes)
+bun run index.ts figma capture 8802-46326
+
+# DEBUG level (includes additional details like headers, node IDs, buffer sizes)
+LOG_LEVEL=debug bun run index.ts figma capture 8802-46326
+
+# WARN level (only warnings and errors)
+LOG_LEVEL=warn bun run index.ts figma capture 8802-46326
+````
+
+Available log levels: `debug`, `info` (default), `warn`, `error`.
+
+Example log output (INFO level):
+
+```
+[2025-11-12T03:26:08.812Z] [INFO] Starting Figma capture process
+[2025-11-12T03:26:08.813Z] [INFO] GET https://api.figma.com/v1/images/...
+[2025-11-12T03:26:09.563Z] [INFO] GET ... - 200 OK (750ms)
+[2025-11-12T03:26:09.564Z] [INFO] Downloading image from https://...
+[2025-11-12T03:26:10.520Z] [INFO] Downloaded image (1273.74 KB) in 956ms
+[2025-11-12T03:26:13.437Z] [INFO] Writing file: /path/to/output.png
+[2025-11-12T03:26:13.443Z] [INFO] Saved 8802:46326 (1273.74 KB) to /path/to/output.png
+[2025-11-12T03:26:13.443Z] [INFO] Capture completed: 1 file(s) saved
+```
+
+### Sample IDs file
+
+```
+# ios onboarding flows
+8802:46326
+https://www.figma.com/design/fl5uK43wSluXQiL7vVHjFq/Project?node-id=7760-56939
+```
+
+Store this as `examples/figma-node-ids.txt` (or any `.txt`) and pass `--ids-file` (positional arguments optional) to capture both nodes in one run. Images will be saved under `outputs/figma/<timestamp>/` with the naming scheme described above.
+
+### Output structure example
+
+After running `bun run index.ts figma capture --ids-file ./examples/figma-node-ids.txt`, files are organized as:
+
+```
+outputs/
+└── figma/
+    ├── .gitkeep
+    └── 2025-11-12T02-01-00-895Z/
+        ├── figma-design-fl5uK43wSluXQiL7vVHjFq-8802-46326.png
+        └── figma-design-fl5uK43wSluXQiL7vVHjFq-7760-56939.png
+```
+
+Each execution creates a new timestamped folder, keeping captures organized by when they were taken.
