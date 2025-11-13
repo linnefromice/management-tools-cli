@@ -10,7 +10,6 @@ import {
   DEFAULT_FIGMA_IMAGE_FORMAT,
   DEFAULT_FIGMA_SCALE,
   FIGMA_OUTPUT_DIR,
-  getFigmaFileKey,
   validateFigmaConfig,
 } from "./config";
 import { fetchFigmaImages, downloadImageBuffer } from "./api";
@@ -40,29 +39,18 @@ const buildOutputPath = (
 
 export const captureFigmaNodes = async ({
   nodeEntries,
-  nodeIds,
   format = DEFAULT_FIGMA_IMAGE_FORMAT,
   scale = DEFAULT_FIGMA_SCALE,
   outputPath,
-  fileKey,
   outputDir = FIGMA_OUTPUT_DIR,
 }: FigmaCaptureOptions): Promise<FigmaCaptureResult[]> => {
   logger.info("Starting Figma capture process");
 
-  // Normalize inputs to FigmaNodeEntry[]
-  let entries: FigmaNodeEntry[];
-  if (nodeEntries && nodeEntries.length > 0) {
-    entries = nodeEntries;
-  } else if (nodeIds && nodeIds.length > 0) {
-    // Legacy mode: all nodes use the same fileKey
-    const fileKeyToUse = fileKey ?? getFigmaFileKey();
-    if (!fileKeyToUse) {
-      throw new Error("Figma file key is not configured.");
-    }
-    entries = nodeIds.map((nodeId) => ({ fileKey: fileKeyToUse, nodeId }));
-  } else {
-    throw new Error("No node IDs supplied.");
+  if (!nodeEntries || nodeEntries.length === 0) {
+    throw new Error("No node entries provided.");
   }
+
+  const entries = nodeEntries;
 
   // Deduplicate by fileKey:nodeId combination
   const uniqueEntries = Array.from(
@@ -157,42 +145,50 @@ export const captureFigmaNodes = async ({
 };
 
 /**
- * Parse node entries from a .txt file (legacy format).
- * Each line can be a node ID or a Figma URL.
- * Lines starting with # are ignored.
+ * Parse node entries from a .txt file.
+ * Each line must be either:
+ * - A full Figma URL
+ * - FILE_KEY#NODE_ID format (e.g., "fl5uK43wSluXQiL7vVHjFq#8802:46326")
+ * Lines starting with # are ignored as comments.
  */
-const parseNodeEntriesFromTxt = async (
-  filePath: string,
-  fallbackFileKey: string,
-): Promise<FigmaNodeEntry[]> => {
+const parseNodeEntriesFromTxt = async (filePath: string): Promise<FigmaNodeEntry[]> => {
   const fileContent = await fs.readFile(filePath, "utf8");
   const lines = fileContent
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith("#"));
 
-  return lines.map((line) => {
+  return lines.map((line, index) => {
     // Check if it's a URL
     try {
       new URL(line);
       const { fileKey, nodeId } = parseNodeEntryFromUrl(line);
       return { fileKey, nodeId };
     } catch {
-      // Not a URL, treat as node ID
-      const nodeId = parseNodeId(line);
-      return { fileKey: fallbackFileKey, nodeId };
+      // Not a URL, check for FILE_KEY#NODE_ID format
+      if (line.includes("#")) {
+        const parts = line.split("#");
+        if (parts.length === 2 && parts[0] && parts[1]) {
+          const fileKey = parts[0].trim();
+          const nodeId = parseNodeId(parts[1].trim());
+          return { fileKey, nodeId };
+        }
+      }
+      // Invalid format
+      throw new Error(
+        `Invalid format at line ${index + 1}: "${line}". Expected either a Figma URL or FILE_KEY#NODE_ID format.`,
+      );
     }
   });
 };
 
 /**
- * Parse node entries from a .json file (new format).
- * Each entry can specify its own fileKey or use a URL.
+ * Parse node entries from a .json file.
+ * Each entry must provide either:
+ * - A 'url' field with a full Figma URL
+ * - Both 'fileKey' and 'nodeId' fields
  */
-const parseNodeEntriesFromJson = async (
-  filePath: string,
-  fallbackFileKey: string,
-): Promise<FigmaNodeEntry[]> => {
+const parseNodeEntriesFromJson = async (filePath: string): Promise<FigmaNodeEntry[]> => {
   const fileContent = await fs.readFile(filePath, "utf8");
   const configs: FigmaNodeConfig[] = JSON.parse(fileContent);
 
@@ -208,19 +204,18 @@ const parseNodeEntriesFromJson = async (
     }
 
     if (config.nodeId) {
-      // Use provided nodeId and fileKey (or fallback)
-      const fileKey = config.fileKey || fallbackFileKey;
-      if (!fileKey) {
+      // Require explicit fileKey
+      if (!config.fileKey) {
         throw new Error(
-          `Entry at index ${index}: fileKey is required when nodeId is specified without a URL.`,
+          `Entry at index ${index}: 'fileKey' is required when using 'nodeId'. Either provide both 'fileKey' and 'nodeId', or use 'url' instead.`,
         );
       }
       const nodeId = parseNodeId(config.nodeId);
-      return { fileKey, nodeId };
+      return { fileKey: config.fileKey, nodeId };
     }
 
     throw new Error(
-      `Entry at index ${index}: must provide either 'url' or 'nodeId' (with optional 'fileKey').`,
+      `Entry at index ${index}: must provide either 'url' or both 'fileKey' and 'nodeId'.`,
     );
   });
 };
@@ -228,30 +223,20 @@ const parseNodeEntriesFromJson = async (
 /**
  * Parse node entries from a file (.txt or .json).
  * Returns an array of FigmaNodeEntry with fileKey and nodeId pairs.
+ * Each entry must explicitly specify its fileKey (no environment variable fallback).
  */
-export const parseNodeEntriesFromFile = async (
-  filePath: string,
-  fallbackFileKey?: string,
-): Promise<FigmaNodeEntry[]> => {
+export const parseNodeEntriesFromFile = async (filePath: string): Promise<FigmaNodeEntry[]> => {
   const resolved = path.resolve(process.cwd(), filePath);
   const ext = path.extname(resolved).toLowerCase();
 
-  // Only fallback to env var if no fallbackFileKey is explicitly provided
-  const fileKey = fallbackFileKey !== undefined ? fallbackFileKey : getFigmaFileKey();
-
   if (ext === ".json") {
     logger.debug(`Parsing JSON configuration from ${resolved}`);
-    return parseNodeEntriesFromJson(resolved, fileKey);
+    return parseNodeEntriesFromJson(resolved);
   }
 
   if (ext === ".txt" || !ext) {
-    if (!fileKey) {
-      throw new Error(
-        "Figma file key is required for .txt format. Set FIGMA_FILE_KEY or use --file option.",
-      );
-    }
     logger.debug(`Parsing TXT configuration from ${resolved}`);
-    return parseNodeEntriesFromTxt(resolved, fileKey);
+    return parseNodeEntriesFromTxt(resolved);
   }
 
   throw new Error(`Unsupported file format: ${ext}. Only .txt and .json are supported.`);

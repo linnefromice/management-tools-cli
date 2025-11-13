@@ -67,14 +67,6 @@ describe("parseNodeEntriesFromFile", () => {
       ]);
     });
 
-    test("uses fallback fileKey for entries without fileKey", async () => {
-      const jsonPath = path.join(tmpDir, "test-fallback.json");
-      await fs.writeFile(jsonPath, JSON.stringify([{ nodeId: "123:456" }]));
-
-      const result = await parseNodeEntriesFromFile(jsonPath, "fallbackFileKey");
-      expect(result).toEqual([{ fileKey: "fallbackFileKey", nodeId: "123:456" }]);
-    });
-
     test("throws on invalid JSON array", async () => {
       const jsonPath = path.join(tmpDir, "test-invalid.json");
       await fs.writeFile(jsonPath, JSON.stringify({ invalid: "object" }));
@@ -87,28 +79,29 @@ describe("parseNodeEntriesFromFile", () => {
       await fs.writeFile(jsonPath, JSON.stringify([{ fileKey: "fileKey1" }]));
 
       await expect(parseNodeEntriesFromFile(jsonPath)).rejects.toThrow(
-        /must provide either 'url' or 'nodeId'/,
+        /must provide either 'url' or both 'fileKey' and 'nodeId'/,
       );
     });
 
-    test("throws when nodeId is specified without fileKey and no fallback", async () => {
+    test("throws when nodeId is specified without fileKey", async () => {
       const jsonPath = path.join(tmpDir, "test-no-filekey.json");
       await fs.writeFile(jsonPath, JSON.stringify([{ nodeId: "123:456" }]));
 
-      // Explicitly pass empty string to avoid env var fallback
-      await expect(parseNodeEntriesFromFile(jsonPath, "")).rejects.toThrow(/fileKey is required/);
+      await expect(parseNodeEntriesFromFile(jsonPath)).rejects.toThrow(
+        /'fileKey' is required when using 'nodeId'/,
+      );
     });
   });
 
   describe("TXT format", () => {
-    test("parses TXT with node IDs using fallback fileKey", async () => {
+    test("parses TXT with FILE_KEY#NODE_ID format", async () => {
       const txtPath = path.join(tmpDir, "test-nodes.txt");
-      await fs.writeFile(txtPath, "123:456\n789:012");
+      await fs.writeFile(txtPath, "fileKey1#123:456\nfileKey2#789:012");
 
-      const result = await parseNodeEntriesFromFile(txtPath, "fallbackFileKey");
+      const result = await parseNodeEntriesFromFile(txtPath);
       expect(result).toEqual([
-        { fileKey: "fallbackFileKey", nodeId: "123:456" },
-        { fileKey: "fallbackFileKey", nodeId: "789:012" },
+        { fileKey: "fileKey1", nodeId: "123:456" },
+        { fileKey: "fileKey2", nodeId: "789:012" },
       ]);
     });
 
@@ -119,46 +112,56 @@ describe("parseNodeEntriesFromFile", () => {
         "https://www.figma.com/design/fileKey1/Project?node-id=123-456\nhttps://www.figma.com/design/fileKey2/Project?node-id=789-012",
       );
 
-      const result = await parseNodeEntriesFromFile(txtPath, "fallbackFileKey");
+      const result = await parseNodeEntriesFromFile(txtPath);
       expect(result).toEqual([
         { fileKey: "fileKey1", nodeId: "123:456" },
         { fileKey: "fileKey2", nodeId: "789:012" },
       ]);
     });
 
-    test("parses TXT with mixed URLs and node IDs", async () => {
+    test("parses TXT with mixed URLs and FILE_KEY#NODE_ID", async () => {
       const txtPath = path.join(tmpDir, "test-mixed.txt");
       await fs.writeFile(
         txtPath,
-        "123:456\nhttps://www.figma.com/design/fileKey2/Project?node-id=789-012",
+        "fileKey1#123:456\nhttps://www.figma.com/design/fileKey2/Project?node-id=789-012",
       );
 
-      const result = await parseNodeEntriesFromFile(txtPath, "fallbackFileKey");
+      const result = await parseNodeEntriesFromFile(txtPath);
       expect(result).toEqual([
-        { fileKey: "fallbackFileKey", nodeId: "123:456" },
+        { fileKey: "fileKey1", nodeId: "123:456" },
         { fileKey: "fileKey2", nodeId: "789:012" },
       ]);
     });
 
     test("ignores comments and empty lines", async () => {
       const txtPath = path.join(tmpDir, "test-comments.txt");
-      await fs.writeFile(txtPath, "# Comment\n123:456\n\n789:012\n# Another comment");
+      await fs.writeFile(
+        txtPath,
+        "# Comment\nfileKey1#123:456\n\nfileKey2#789:012\n# Another comment",
+      );
 
-      const result = await parseNodeEntriesFromFile(txtPath, "fallbackFileKey");
+      const result = await parseNodeEntriesFromFile(txtPath);
       expect(result).toEqual([
-        { fileKey: "fallbackFileKey", nodeId: "123:456" },
-        { fileKey: "fallbackFileKey", nodeId: "789:012" },
+        { fileKey: "fileKey1", nodeId: "123:456" },
+        { fileKey: "fileKey2", nodeId: "789:012" },
       ]);
     });
 
-    test("throws when no fallback fileKey is provided", async () => {
-      const txtPath = path.join(tmpDir, "test-no-fallback.txt");
+    test("throws when node ID is provided without fileKey (no # separator)", async () => {
+      const txtPath = path.join(tmpDir, "test-no-filekey.txt");
       await fs.writeFile(txtPath, "123:456");
 
-      // Explicitly pass empty string to avoid env var fallback
-      await expect(parseNodeEntriesFromFile(txtPath, "")).rejects.toThrow(
-        /file key is required for .txt format/,
+      await expect(parseNodeEntriesFromFile(txtPath)).rejects.toThrow(
+        /Invalid format.*Expected either a Figma URL or FILE_KEY#NODE_ID format/,
       );
+    });
+
+    test("normalizes dash format in FILE_KEY#NODE_ID", async () => {
+      const txtPath = path.join(tmpDir, "test-dash-format.txt");
+      await fs.writeFile(txtPath, "fileKey1#123-456");
+
+      const result = await parseNodeEntriesFromFile(txtPath);
+      expect(result).toEqual([{ fileKey: "fileKey1", nodeId: "123:456" }]);
     });
   });
 
@@ -170,12 +173,12 @@ describe("parseNodeEntriesFromFile", () => {
       await expect(parseNodeEntriesFromFile(xmlPath)).rejects.toThrow(/Unsupported file format/);
     });
 
-    test("treats files without extension as TXT", async () => {
+    test("treats files without extension as TXT and requires FILE_KEY#NODE_ID format", async () => {
       const noExtPath = path.join(tmpDir, "test-no-ext");
-      await fs.writeFile(noExtPath, "123:456");
+      await fs.writeFile(noExtPath, "fileKey1#123:456");
 
-      const result = await parseNodeEntriesFromFile(noExtPath, "fallbackFileKey");
-      expect(result).toEqual([{ fileKey: "fallbackFileKey", nodeId: "123:456" }]);
+      const result = await parseNodeEntriesFromFile(noExtPath);
+      expect(result).toEqual([{ fileKey: "fileKey1", nodeId: "123:456" }]);
     });
   });
 });

@@ -1,22 +1,15 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { captureFigmaNodes, parseNodeIdsFromFile, validateFigmaConfig } from "../src/figma";
+import { captureFigmaNodes, parseNodeEntriesFromFile, validateFigmaConfig } from "../src/figma";
 
 const ORIGINAL_ENV = {
-  FIGMA_FILE_KEY: process.env.FIGMA_FILE_KEY,
   FIGMA_ACCESS_TOKEN: process.env.FIGMA_ACCESS_TOKEN,
 };
 
 const ORIGINAL_FETCH = globalThis.fetch;
 
 const resetEnv = () => {
-  if (ORIGINAL_ENV.FIGMA_FILE_KEY === undefined) {
-    delete process.env.FIGMA_FILE_KEY;
-  } else {
-    process.env.FIGMA_FILE_KEY = ORIGINAL_ENV.FIGMA_FILE_KEY;
-  }
-
   if (ORIGINAL_ENV.FIGMA_ACCESS_TOKEN === undefined) {
     delete process.env.FIGMA_ACCESS_TOKEN;
   } else {
@@ -24,17 +17,16 @@ const resetEnv = () => {
   }
 };
 
-describe("parseNodeIdsFromFile", () => {
+describe("parseNodeEntriesFromFile", () => {
   const tmpFile = path.resolve("tmp/figma-node-ids.txt");
 
   beforeEach(async () => {
-    process.env.FIGMA_FILE_KEY = "testFileKey";
     await fs.mkdir(path.dirname(tmpFile), { recursive: true });
     await fs.writeFile(
       tmpFile,
       [
         "# onboarding screens",
-        "123:456",
+        "testFileKey#123:456",
         "https://www.figma.com/design/file/slug?node-id=789-012&m=dev",
         "",
         "  ",
@@ -43,13 +35,15 @@ describe("parseNodeIdsFromFile", () => {
   });
 
   afterEach(async () => {
-    resetEnv();
     await fs.rm(path.dirname(tmpFile), { recursive: true, force: true });
   });
 
-  test("parses IDs and URLs from text file", async () => {
-    const ids = await parseNodeIdsFromFile(tmpFile);
-    expect(ids).toEqual(["123:456", "789:012"]);
+  test("parses FILE_KEY#NODE_ID and URLs from text file", async () => {
+    const entries = await parseNodeEntriesFromFile(tmpFile);
+    expect(entries).toEqual([
+      { fileKey: "testFileKey", nodeId: "123:456" },
+      { fileKey: "file", nodeId: "789:012" },
+    ]);
   });
 });
 
@@ -57,7 +51,6 @@ describe("captureFigmaNodes", () => {
   const outputDir = path.resolve("tmp/figma-output");
 
   beforeEach(() => {
-    process.env.FIGMA_FILE_KEY = "testFileKey";
     process.env.FIGMA_ACCESS_TOKEN = "test-token";
 
     const imageMap = {
@@ -104,7 +97,10 @@ describe("captureFigmaNodes", () => {
 
   test("writes images to disk with default naming", async () => {
     const results = await captureFigmaNodes({
-      nodeIds: ["123:456", "789:012"],
+      nodeEntries: [
+        { fileKey: "testFileKey", nodeId: "123:456" },
+        { fileKey: "testFileKey", nodeId: "789:012" },
+      ],
       format: "png",
       scale: 2,
       outputDir,
@@ -120,8 +116,9 @@ describe("captureFigmaNodes", () => {
     }
   });
 
-  test("validateFigmaConfig reflects env state", () => {
+  test("validateFigmaConfig only requires FIGMA_ACCESS_TOKEN", () => {
     const validation = validateFigmaConfig();
     expect(validation.valid).toBe(true);
+    expect(validation.errors).toHaveLength(0);
   });
 });

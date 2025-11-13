@@ -4,13 +4,10 @@ export type FigmaScale = 1 | 2 | 3 | 4;
 
 export interface FigmaCaptureOptions {
   /**
-   * Node entries with fileKey and nodeId pairs (preferred way)
+   * Node entries with fileKey and nodeId pairs.
+   * Each entry must explicitly specify both fileKey and nodeId.
    */
-  nodeEntries?: FigmaNodeEntry[];
-  /**
-   * @deprecated Use nodeEntries instead. Simple node IDs without explicit file keys.
-   */
-  nodeIds?: string[];
+  nodeEntries: FigmaNodeEntry[];
   format?: FigmaImageFormat;
   scale?: FigmaScale;
   /**
@@ -18,10 +15,6 @@ export interface FigmaCaptureOptions {
    * instead of the default `outputs/figma/...` location.
    */
   outputPath?: string;
-  /**
-   * @deprecated Use nodeEntries instead. Optional override for the configured Figma file key.
-   */
-  fileKey?: string;
   /**
    * Override for the base output directory. Defaults to `outputs/figma`.
    */
