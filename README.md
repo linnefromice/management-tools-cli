@@ -108,13 +108,13 @@ The Figma capture command includes detailed logging for API requests and file do
 
 ```bash
 # Default: INFO level (shows API requests, downloads, and file writes)
-bun run index.ts figma capture 8802-46326
+bun run index.ts figma capture --ids-file ./examples/figma-node-ids.txt
 
 # DEBUG level (includes additional details like headers, node IDs, buffer sizes)
-LOG_LEVEL=debug bun run index.ts figma capture 8802-46326
+LOG_LEVEL=debug bun run index.ts figma capture --ids-file ./examples/figma-node-ids.txt
 
 # WARN level (only warnings and errors)
-LOG_LEVEL=warn bun run index.ts figma capture 8802-46326
+LOG_LEVEL=warn bun run index.ts figma capture --ids-file ./examples/figma-node-ids.txt
 ```
 
 Available log levels: `debug`, `info` (default), `warn`, `error`.
