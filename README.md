@@ -27,12 +27,11 @@ For the new Figma capture workflow also set:
 
 ```env
 FIGMA_ACCESS_TOKEN=figd_xxx
-FIGMA_FILE_KEY=fl5uK43wSluXQiL7vVHjFq
 # Optional override (defaults to https://api.figma.com)
 FIGMA_API_BASE_URL=https://api.figma.com
 ```
 
-`FIGMA_ACCESS_TOKEN` must have the "File export" scope. `FIGMA_FILE_KEY` is the file ID segment in your Figma URL (`https://www.figma.com/design/<FILE_KEY>/...` or `https://www.figma.com/file/<FILE_KEY>/...`) and is used as a fallback when not specified in JSON configuration or URLs.
+`FIGMA_ACCESS_TOKEN` must have the "File export" scope. File keys must be specified explicitly in your configuration files (.txt or .json) - see the Figma section below for details.
 
 ## Linear commands
 
@@ -88,20 +87,15 @@ This project was created using `bun init` in bun v1.3.1. [Bun](https://bun.com) 
 Use the Figma REST API to download rendered node images directly from the CLI.
 
 ```bash
-bun run index.ts figma capture [node-id-or-url ...] \
-  [--ids-file ./figma-nodes.json] \
+bun run index.ts figma capture --ids-file <PATH> \
   [--scale 2] \
   [--format png] \
-  [--file <override-file-key>] \
   [--output ./custom/path.png]
 ```
 
-````
-
-- Provide zero or more positional node references (raw IDs like `8802:46326`, dash format `8802-46326`, or full URLs such as `https://www.figma.com/design/<FILE>/<Slug>?node-id=7760-56939&m=dev`). When only using `--ids-file`, omit the positional arguments entirely.
-- Use `--ids-file` to pass a configuration file (`.json` or `.txt`):
+- `--ids-file` is **required** and must point to a configuration file (`.json` or `.txt`):
   - **JSON format** (recommended): Specify individual `fileKey` and `nodeId` pairs, or full URLs. See `examples/figma-nodes.json`.
-  - **TXT format** (legacy): One node ID or URL per line, `#` comments supported. See `examples/figma-node-ids.txt`.
+  - **TXT format**: Each line must be either `FILE_KEY#NODE_ID` or a full Figma URL. See `examples/figma-node-ids.txt`.
 - The command groups nodes by file key and batches them into `GET /v1/images/<FILE_KEY>?ids=<...>` requests, downloads each signed URL, and writes images under `outputs/figma/<timestamp>/`.
 - Each execution creates a new timestamped folder (e.g., `outputs/figma/2025-11-12T02-01-00-895Z/`).
 - Output filenames follow `figma-design-${file-key}-${node-id-with-hyphen}.${format}` (e.g., `figma-design-fl5uK43wSluXQiL7vVHjFq-7760-56939.png`).
@@ -121,7 +115,7 @@ LOG_LEVEL=debug bun run index.ts figma capture 8802-46326
 
 # WARN level (only warnings and errors)
 LOG_LEVEL=warn bun run index.ts figma capture 8802-46326
-````
+```
 
 Available log levels: `debug`, `info` (default), `warn`, `error`.
 
@@ -152,32 +146,29 @@ The JSON format allows you to specify a `fileKey` for each node individually, en
   },
   {
     "url": "https://www.figma.com/design/anotherFileKey/Project?node-id=7760-56939&m=dev"
-  },
-  {
-    "nodeId": "1234:5678"
   }
 ]
 ```
 
-- Each entry can specify:
-  - `fileKey` + `nodeId`: Explicit file and node IDs
+- Each entry must specify **either**:
+  - Both `fileKey` and `nodeId`: Explicit file and node IDs (both required)
   - `url`: Full Figma URL (file key and node ID extracted automatically)
-  - `nodeId` only: Uses `FIGMA_FILE_KEY` from environment or `--file` flag as fallback
 - Store this as `examples/figma-nodes.json` and use `--ids-file ./examples/figma-nodes.json`
 
-#### TXT format (legacy)
+#### TXT format
 
-The TXT format supports one node ID or URL per line:
+The TXT format supports one entry per line with the following formats:
 
 ```
 # ios onboarding flows
-8802:46326
+fl5uK43wSluXQiL7vVHjFq#8802:46326
 https://www.figma.com/design/fl5uK43wSluXQiL7vVHjFq/Project?node-id=7760-56939
 ```
 
 - Lines starting with `#` are ignored as comments
-- Node IDs use the `FIGMA_FILE_KEY` from environment or `--file` flag
-- URLs automatically extract the file key from the URL
+- Each line must be **either**:
+  - `FILE_KEY#NODE_ID` format (e.g., `fl5uK43wSluXQiL7vVHjFq#8802:46326`)
+  - Full Figma URL (file key and node ID extracted automatically)
 - Store this as `examples/figma-node-ids.txt` and use `--ids-file ./examples/figma-node-ids.txt`
 
 Both formats will save images under `outputs/figma/<timestamp>/` with the naming scheme described above.
@@ -188,23 +179,14 @@ Both formats will save images under `outputs/figma/<timestamp>/` with the naming
 # Capture nodes from a JSON file (supports multiple file keys)
 bun run index.ts figma capture --ids-file ./examples/figma-nodes.json
 
-# Capture nodes from a TXT file (legacy format)
+# Capture nodes from a TXT file
 bun run index.ts figma capture --ids-file ./examples/figma-node-ids.txt
-
-# Capture a single node with positional argument
-bun run index.ts figma capture 8802:46326
-
-# Capture from a full URL
-bun run index.ts figma capture "https://www.figma.com/design/fl5uK43wSluXQiL7vVHjFq/Project?node-id=7760-56939"
-
-# Mix positional arguments and file input
-bun run index.ts figma capture 8802:46326 --ids-file ./examples/figma-nodes.json
 
 # Capture at higher scale and different format
 bun run index.ts figma capture --ids-file ./examples/figma-nodes.json --scale 4 --format jpg
 
-# Capture to a custom path (single node only)
-bun run index.ts figma capture 8802:46326 --output ./my-design.png
+# Capture to a custom path (single node only - create a file with one entry)
+bun run index.ts figma capture --ids-file ./single-node.txt --output ./my-design.png
 ```
 
 ### Output structure example

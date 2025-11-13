@@ -25,12 +25,7 @@ import {
   writeLinearDataset,
 } from "./src/storage";
 import { getUsageText, getLinearUsageText, getFigmaUsageText } from "./src/help";
-import {
-  captureFigmaNodes,
-  parseNodeId,
-  parseNodeEntriesFromFile,
-  validateFigmaConfig,
-} from "./src/figma";
+import { captureFigmaNodes, parseNodeEntriesFromFile, validateFigmaConfig } from "./src/figma";
 import type { FigmaNodeEntry } from "./src/figma/types";
 import { normalizeFormat, printPayload, writePayload } from "./src/output";
 import { logger } from "./src/logger";
@@ -83,7 +78,6 @@ const flagsRequiringValue = new Set([
   "--output",
   "--scale",
   "--ids-file",
-  "--file",
 ]);
 
 const getPositionalArgs = (args: string[]) => {
@@ -409,10 +403,10 @@ const runFigmaCapture = async (args: string[]) => {
     process.exit(1);
   }
 
-  const positional = getPositionalArgs(args);
   const idsFilePath = getFlagValue(args, "ids-file");
 
-  if (!positional.length && !idsFilePath) {
+  if (!idsFilePath) {
+    console.error("Error: --ids-file is required.");
     printFigmaHelp();
     process.exit(1);
   }
@@ -437,45 +431,19 @@ const runFigmaCapture = async (args: string[]) => {
   }
 
   const outputPath = getFlagValue(args, "output");
-  const fileKeyOverride = getFlagValue(args, "file");
 
-  // Collect node entries from file (supports .txt and .json)
-  let fileNodeEntries: FigmaNodeEntry[] = [];
-  if (idsFilePath) {
-    try {
-      fileNodeEntries = await parseNodeEntriesFromFile(idsFilePath, fileKeyOverride);
-    } catch (error) {
-      console.error(`Failed to load IDs from "${idsFilePath}"`);
-      if (error instanceof Error) console.error(error.message);
-      process.exit(1);
-    }
+  // Load node entries from file (supports .txt and .json)
+  let nodeEntries: FigmaNodeEntry[] = [];
+  try {
+    nodeEntries = await parseNodeEntriesFromFile(idsFilePath);
+  } catch (error) {
+    console.error(`Failed to load node entries from "${idsFilePath}"`);
+    if (error instanceof Error) console.error(error.message);
+    process.exit(1);
   }
 
-  // Collect node entries from positional arguments (legacy mode: all use same fileKey)
-  let directNodeEntries: FigmaNodeEntry[] = [];
-  if (positional.length > 0) {
-    const defaultFileKey = fileKeyOverride || process.env.FIGMA_FILE_KEY || "";
-    if (!defaultFileKey) {
-      console.error(
-        "Error: File key is required when using positional node IDs. Set FIGMA_FILE_KEY or use --file.",
-      );
-      process.exit(1);
-    }
-    try {
-      directNodeEntries = positional.map((value) => ({
-        fileKey: defaultFileKey,
-        nodeId: parseNodeId(value),
-      }));
-    } catch (error) {
-      console.error("Failed to parse node ID input.");
-      if (error instanceof Error) console.error(error.message);
-      process.exit(1);
-    }
-  }
-
-  const nodeEntries = [...fileNodeEntries, ...directNodeEntries];
   if (!nodeEntries.length) {
-    console.error("No valid node IDs were provided.");
+    console.error("No valid node entries were found in the file.");
     process.exit(1);
   }
 
