@@ -72,6 +72,76 @@ Once `GITHUB_TOKEN` and repository env vars are in place you can inspect pull re
 | `bun run index.ts github prs`         | Lists pull requests for the configured repository, including reviewer assignments/statuses and labels | `--state open|closed|all`, `--limit <N>` (default 20, max 200), `--created-after/--created-before <ISO>`, `--updated-after/--updated-before <ISO>`, `--format csv` |
 | `bun run index.ts github review-status` | Highlights open PRs updated within the last 7 days, focusing on reviewer states + labels            | `--limit <N>` (default 50), `--format csv`, `--output [path]`, `--all-fields`                                                                                      |
 
+### `github prs` details
+
+This command mirrors the GitHub PR list endpoint and enriches each entry with:
+
+- `number`, `title`, `state`, `draft`, `author`, `headRef`, `baseRef`, `url`
+- Timestamps (`createdAt`, `updatedAt`, `mergedAt`)
+- `labels`: array of label names on the PR
+- `reviewers`: the latest reviewer roster with state + metadata
+- `reviewSummary`: counts of approved/changes-requested/commented/dismissed/pending reviews plus `overallStatus`
+
+Example:
+
+```json
+{
+  "number": 52,
+  "title": "[WIP] Align mobile dashboard cards",
+  "state": "open",
+  "draft": true,
+  "author": "alice-dev",
+  "labels": ["needs-design", "mobile"],
+  "createdAt": "2025-01-04T12:20:37Z",
+  "updatedAt": "2025-01-10T08:50:24Z",
+  "headRef": "feat/mobile-dashboard",
+  "baseRef": "main",
+  "reviewSummary": {
+    "approved": 0,
+    "changesRequested": 0,
+    "commented": 0,
+    "dismissed": 0,
+    "pending": 3,
+    "total": 3,
+    "overallStatus": "pending"
+  },
+  "reviewers": [
+    { "type": "USER", "login": "bruno-qa", "state": "REVIEW_REQUESTED" },
+    { "type": "USER", "login": "casey-ios", "state": "REVIEW_REQUESTED" },
+    { "type": "USER", "login": "drew-design", "state": "REVIEW_REQUESTED" }
+  ]
+}
+```
+
+Use `--state`/`--limit`/`--created-after`/`--updated-after` to focus on specific slices, then pipe the structured JSON or CSV downstream.
+
+### `github review-status` details
+
+This reporter is optimized for daily standups. It automatically:
+
+- Filters to `state=open` and `updatedAt >= now - 7 days`
+- Emits minimal fields: `number`, `title`, `titleIncludesWip`, `draft`, `author`, `updatedAt`, `labels`, and a reviewer state map `{ login: "APPROVED" | "REVIEW_REQUESTED" | ... }`
+- Honors `--limit`, `--format`, `--output`, and `--all-fields` (to include unfiltered payloads if needed)
+
+Example row:
+
+```json
+{
+  "number": 52,
+  "title": "[WIP] Align mobile dashboard cards",
+  "titleIncludesWip": true,
+  "draft": true,
+  "author": "alice-dev",
+  "updatedAt": "2025-01-10T08:50:24Z",
+  "labels": ["needs-design", "mobile"],
+  "reviewers": {
+    "bruno-qa": "REVIEW_REQUESTED",
+    "casey-ios": "REVIEW_REQUESTED",
+    "drew-design": "REVIEW_REQUESTED"
+  }
+}
+```
+
 Examples:
 
 ```bash
