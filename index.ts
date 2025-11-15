@@ -24,11 +24,17 @@ import {
   searchStoredIssues,
   writeLinearDataset,
 } from "./src/storage";
-import { getUsageText, getLinearUsageText, getFigmaUsageText } from "./src/help";
+import {
+  getUsageText,
+  getLinearUsageText,
+  getFigmaUsageText,
+  getGithubUsageText,
+} from "./src/help";
 import { captureFigmaNodes, parseNodeEntriesFromFile, validateFigmaConfig } from "./src/figma";
 import type { FigmaNodeEntry } from "./src/figma/types";
 import { normalizeFormat, printPayload, writePayload } from "./src/output";
 import { logger } from "./src/logger";
+import { fetchRepositoryPullRequests } from "./src/github";
 
 const [, , command, ...rawArgs] = process.argv;
 
@@ -42,6 +48,10 @@ const printLinearHelp = () => {
 
 const printFigmaHelp = () => {
   console.log(getFigmaUsageText());
+};
+
+const printGithubHelp = () => {
+  console.log(getGithubUsageText());
 };
 
 const exitWithUsage = (message?: string) => {
@@ -78,6 +88,12 @@ const flagsRequiringValue = new Set([
   "--output",
   "--scale",
   "--ids-file",
+  "--state",
+  "--limit",
+  "--created-after",
+  "--created-before",
+  "--updated-after",
+  "--updated-before",
 ]);
 
 const getPositionalArgs = (args: string[]) => {
@@ -391,6 +407,96 @@ const runLinear = async (args: string[]) => {
   }
 };
 
+const runGithubPullRequests = async (args: string[]) => {
+  const format = parseOutputFormat(args);
+  const skipAnalyticsFilter = parseAllFieldsFlag(args);
+  const outputOption = parseOutputOption(args);
+
+  const parseState = (): "open" | "closed" | "all" => {
+    const value = getFlagValue(args, "state");
+    if (!value) return "open";
+    const normalized = value.toLowerCase();
+    if (normalized === "open" || normalized === "closed" || normalized === "all") {
+      return normalized;
+    }
+    throw new Error('Invalid --state value. Use "open", "closed", or "all".');
+  };
+
+  const parseLimit = () => {
+    const value = getFlagValue(args, "limit");
+    if (!value) return 20;
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new Error("--limit must be a positive integer.");
+    }
+    return Math.min(parsed, 200);
+  };
+
+  const parseDateFlag = (flag: string) => {
+    const value = getFlagValue(args, flag);
+    if (!value) return undefined;
+    const timestamp = Date.parse(value);
+    if (Number.isNaN(timestamp)) {
+      throw new Error(`Invalid ISO timestamp for --${flag}: ${value}`);
+    }
+    return new Date(timestamp);
+  };
+
+  try {
+    const state = parseState();
+    const limit = parseLimit();
+    const createdAfter = parseDateFlag("created-after");
+    const createdBefore = parseDateFlag("created-before");
+    const updatedAfter = parseDateFlag("updated-after");
+    const updatedBefore = parseDateFlag("updated-before");
+
+    const payload = await fetchRepositoryPullRequests({
+      state,
+      limit,
+      createdAfter,
+      createdBefore,
+      updatedAfter,
+      updatedBefore,
+    });
+
+    const collectionKey = "pullRequests";
+
+    if (!outputOption.enabled) {
+      printPayload(payload, format, { collectionKey, skipAnalyticsFilter });
+    } else {
+      const targetPath = outputOption.path ?? buildDefaultOutputPath("github-prs", format);
+      await writePayload(payload, format, { collectionKey, skipAnalyticsFilter }, targetPath);
+      console.log(`Saved output to ${targetPath}`);
+    }
+  } catch (error) {
+    console.error("Failed to list GitHub pull requests.");
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+    process.exit(1);
+  }
+};
+
+const runGithub = async (args: string[]) => {
+  const [subCommand, ...githubArgs] = args;
+
+  if (!subCommand || subCommand === "help") {
+    printGithubHelp();
+    if (!subCommand) process.exit(1);
+    return;
+  }
+
+  switch (subCommand) {
+    case "prs":
+      await runGithubPullRequests(githubArgs);
+      break;
+    default:
+      console.error(`Unknown github subcommand: ${subCommand}`);
+      printGithubHelp();
+      process.exit(1);
+  }
+};
+
 /**
  * figma capture コマンドの実行
  */
@@ -503,6 +609,9 @@ switch (command) {
     break;
   case "figma":
     void runFigma(rawArgs);
+    break;
+  case "github":
+    void runGithub(rawArgs);
     break;
   default:
     exitWithUsage(`Unknown command: ${command}`);

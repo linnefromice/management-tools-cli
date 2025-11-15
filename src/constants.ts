@@ -92,6 +92,22 @@ export const ANALYTICS_CYCLE_FIELDS = [
   "updatedAt",
 ] as const;
 
+export const ANALYTICS_PULL_REQUEST_FIELDS = [
+  "number",
+  "title",
+  "state",
+  "draft",
+  "author",
+  "createdAt",
+  "updatedAt",
+  "mergedAt",
+  "headRef",
+  "baseRef",
+  "url",
+  "reviewSummary",
+  "reviewers",
+] as const;
+
 export const ANALYTICS_FIELD_WHITELIST: Record<string, readonly string[]> = {
   issues: ANALYTICS_ISSUE_FIELDS,
   projects: ANALYTICS_PROJECT_FIELDS,
@@ -99,6 +115,7 @@ export const ANALYTICS_FIELD_WHITELIST: Record<string, readonly string[]> = {
   users: ANALYTICS_USER_FIELDS,
   labels: ANALYTICS_LABEL_FIELDS,
   cycles: ANALYTICS_CYCLE_FIELDS,
+  pullRequests: ANALYTICS_PULL_REQUEST_FIELDS,
 };
 
 // Figma MCP Server 設定

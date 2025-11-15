@@ -10,7 +10,8 @@ export const getUsageText = () => `Usage:
   cli-name linear cycles [--format csv] [--remote] [--output <PATH>] [--all-fields]
   cli-name linear search-issues [--project <ID>] [--label <ID>] [--cycle <ID>] [--format csv] [--output <PATH>] [--all-fields]
   cli-name linear sync
-  cli-name figma capture --ids-file <PATH> [--format png|jpg] [--scale 1-4] [--output <PATH>]`;
+  cli-name figma capture --ids-file <PATH> [--format png|jpg] [--scale 1-4] [--output <PATH>]
+  cli-name github prs [--state open|closed|all] [--limit <N>] [--format csv] [--output <PATH>] [--all-fields] [--created-after <ISO>] [--created-before <ISO>] [--updated-after <ISO>] [--updated-before <ISO>]`;
 
 export const getLinearUsageText = () => `Linear commands:
   cli-name linear projects [--full] [--format csv] [--remote] [--output <PATH>] [--all-fields]
@@ -65,3 +66,20 @@ Setup:
   1. Create a Figma Personal Access Token with file export scope.
   2. Set FIGMA_ACCESS_TOKEN in your environment or .env file.
   3. Run the CLI command; images will be saved under outputs/figma by default.`;
+
+export const getGithubUsageText = () => `GitHub commands:
+  cli-name github prs [options]
+
+Options:
+  --state <open|closed|all>   Filter by PR state (default: open)
+  --limit <N>                 Maximum number of PRs to return (default: 20, max: 200)
+  --created-after <ISO>       Only include PRs created after (inclusive) the timestamp
+  --created-before <ISO>      Only include PRs created before (inclusive) the timestamp
+  --updated-after <ISO>       Only include PRs updated after (inclusive) the timestamp
+  --updated-before <ISO>      Only include PRs updated before (inclusive) the timestamp
+  --format <json|csv>         Output format (default: json)
+  --output <path>             Optional file destination; defaults to storage/exports/github-prs-<timestamp>.json
+  --all-fields                Skip analytics-friendly field filtering
+
+Environment:
+  Set GITHUB_TOKEN plus either (GITHUB_OWNER + GITHUB_REPO) or a combined GITHUB_REPOSITORY (owner/repo).`;

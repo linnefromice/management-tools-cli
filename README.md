@@ -33,6 +33,18 @@ FIGMA_API_BASE_URL=https://api.figma.com
 
 `FIGMA_ACCESS_TOKEN` must have the "File export" scope. File keys must be specified explicitly in your configuration files (.txt or .json) - see the Figma section below for details.
 
+For GitHub automation configure:
+
+```env
+GITHUB_TOKEN=ghp_xxx
+GITHUB_OWNER=your-org
+GITHUB_REPO=your-repo
+# or instead of the last two:
+# GITHUB_REPOSITORY=your-org/your-repo
+```
+
+`GITHUB_TOKEN` needs `repo` scope (and `read:org` if you fetch from private org repos). The CLI resolves the repository from either the split owner/repo variables or the combined `GITHUB_REPOSITORY`.
+
 ## Linear commands
 
 After configuring env vars you can inspect Linear data via subcommands:
@@ -50,6 +62,27 @@ After configuring env vars you can inspect Linear data via subcommands:
 | `bun run index.ts linear sync`          | Download teams, projects, issues, users, labels, cycles and store them under `storage/linear/` for offline analysis | —                                                                                                                                                    |
 
 > ヒント: `--remote` を付けると対象データを Linear API から再取得し、ローカルの `storage/linear/*.json` も自動更新します。指定しない場合は最新のローカルキャッシュを読み込みます。
+
+## GitHub commands
+
+Once `GITHUB_TOKEN` and repository env vars are in place you can inspect pull requests directly from GitHub:
+
+| Command                               | Description                                                                                | Useful flags                                                                                                                                                       |
+| ------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bun run index.ts github prs`         | Lists pull requests for the configured repository, including reviewer assignments/statuses | `--state open|closed|all`, `--limit <N>` (default 20, max 200), `--created-after/--created-before <ISO>`, `--updated-after/--updated-before <ISO>`, `--format csv` |
+
+Examples:
+
+```bash
+# Show the latest 10 open PRs updated this week
+bun run index.ts github prs --limit 10 --updated-after 2024-11-01T00:00:00Z
+
+# Export closed PRs created in October to CSV
+bun run index.ts github prs --state closed --created-after 2024-10-01T00:00:00Z \
+  --created-before 2024-11-01T00:00:00Z --format csv --output ./outputs/github/prs-oct.csv
+```
+
+Each entry includes the reviewer roster with their most recent review state plus an aggregate `reviewSummary` (`approved`, `pending`, `changes_requested`, etc.).
 
 ### Output formats
 
