@@ -34,7 +34,7 @@ import { captureFigmaNodes, parseNodeEntriesFromFile, validateFigmaConfig } from
 import type { FigmaNodeEntry } from "./src/figma/types";
 import { normalizeFormat, printPayload, writePayload } from "./src/output";
 import { logger } from "./src/logger";
-import { fetchRepositoryPullRequests } from "./src/github";
+import { fetchRecentReviewStatus, fetchRepositoryPullRequests } from "./src/github";
 
 const [, , command, ...rawArgs] = process.argv;
 
@@ -121,6 +121,36 @@ const parseOutputOption = (args: string[]) => ({
   enabled: hasFlag(args, "output"),
   path: getFlagValue(args, "output"),
 });
+
+const parseStateFlag = (args: string[], defaultState: "open" | "closed" | "all" = "open") => {
+  const value = getFlagValue(args, "state");
+  if (!value) return defaultState;
+  const normalized = value.toLowerCase();
+  if (normalized === "open" || normalized === "closed" || normalized === "all") {
+    return normalized;
+  }
+  throw new Error('Invalid --state value. Use "open", "closed", or "all".');
+};
+
+const parseLimitFlag = (args: string[], defaultValue = 20, max = 200) => {
+  const value = getFlagValue(args, "limit");
+  if (!value) return defaultValue;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error("--limit must be a positive integer.");
+  }
+  return Math.min(parsed, max);
+};
+
+const parseDateFlag = (args: string[], flag: string) => {
+  const value = getFlagValue(args, flag);
+  if (!value) return undefined;
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    throw new Error(`Invalid ISO timestamp for --${flag}: ${value}`);
+  }
+  return new Date(timestamp);
+};
 
 const buildDefaultOutputPath = (commandKey: string, format: string) => {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -412,43 +442,13 @@ const runGithubPullRequests = async (args: string[]) => {
   const skipAnalyticsFilter = parseAllFieldsFlag(args);
   const outputOption = parseOutputOption(args);
 
-  const parseState = (): "open" | "closed" | "all" => {
-    const value = getFlagValue(args, "state");
-    if (!value) return "open";
-    const normalized = value.toLowerCase();
-    if (normalized === "open" || normalized === "closed" || normalized === "all") {
-      return normalized;
-    }
-    throw new Error('Invalid --state value. Use "open", "closed", or "all".');
-  };
-
-  const parseLimit = () => {
-    const value = getFlagValue(args, "limit");
-    if (!value) return 20;
-    const parsed = Number(value);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      throw new Error("--limit must be a positive integer.");
-    }
-    return Math.min(parsed, 200);
-  };
-
-  const parseDateFlag = (flag: string) => {
-    const value = getFlagValue(args, flag);
-    if (!value) return undefined;
-    const timestamp = Date.parse(value);
-    if (Number.isNaN(timestamp)) {
-      throw new Error(`Invalid ISO timestamp for --${flag}: ${value}`);
-    }
-    return new Date(timestamp);
-  };
-
   try {
-    const state = parseState();
-    const limit = parseLimit();
-    const createdAfter = parseDateFlag("created-after");
-    const createdBefore = parseDateFlag("created-before");
-    const updatedAfter = parseDateFlag("updated-after");
-    const updatedBefore = parseDateFlag("updated-before");
+    const state = parseStateFlag(args);
+    const limit = parseLimitFlag(args);
+    const createdAfter = parseDateFlag(args, "created-after");
+    const createdBefore = parseDateFlag(args, "created-before");
+    const updatedAfter = parseDateFlag(args, "updated-after");
+    const updatedBefore = parseDateFlag(args, "updated-before");
 
     const payload = await fetchRepositoryPullRequests({
       state,
@@ -477,6 +477,32 @@ const runGithubPullRequests = async (args: string[]) => {
   }
 };
 
+const runGithubReviewStatus = async (args: string[]) => {
+  const format = parseOutputFormat(args);
+  const skipAnalyticsFilter = parseAllFieldsFlag(args);
+  const outputOption = parseOutputOption(args);
+
+  try {
+    const limit = parseLimitFlag(args, 50);
+    const payload = await fetchRecentReviewStatus({ limit });
+    const collectionKey = "reviewStatus";
+
+    if (!outputOption.enabled) {
+      printPayload(payload, format, { collectionKey, skipAnalyticsFilter });
+    } else {
+      const targetPath = outputOption.path ?? buildDefaultOutputPath("github-review-status", format);
+      await writePayload(payload, format, { collectionKey, skipAnalyticsFilter }, targetPath);
+      console.log(`Saved output to ${targetPath}`);
+    }
+  } catch (error) {
+    console.error("Failed to list GitHub review status.");
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+    process.exit(1);
+  }
+};
+
 const runGithub = async (args: string[]) => {
   const [subCommand, ...githubArgs] = args;
 
@@ -489,6 +515,9 @@ const runGithub = async (args: string[]) => {
   switch (subCommand) {
     case "prs":
       await runGithubPullRequests(githubArgs);
+      break;
+    case "review-status":
+      await runGithubReviewStatus(githubArgs);
       break;
     default:
       console.error(`Unknown github subcommand: ${subCommand}`);

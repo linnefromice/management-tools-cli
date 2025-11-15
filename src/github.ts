@@ -62,6 +62,24 @@ export type GithubPullRequestListResult = {
   pullRequests: GithubPullRequestSummary[];
 };
 
+export type GithubReviewStatusEntry = {
+  number: number;
+  title: string;
+  titleIncludesWip: boolean;
+  draft: boolean;
+  author?: string;
+  reviewers: Record<string, string>;
+  updatedAt: string;
+};
+
+export type GithubReviewStatusResult = {
+  repository: string;
+  fetchedAt: string;
+  windowStart: string;
+  count: number;
+  pullRequests: GithubReviewStatusEntry[];
+};
+
 let octokit: Octokit | null = null;
 
 const getOctokit = () => {
@@ -322,5 +340,44 @@ export const fetchRepositoryPullRequests = async (
     fetchedAt: new Date().toISOString(),
     count: pullRequests.length,
     pullRequests,
+  };
+};
+
+const WIP_REGEX = /\bwip\b/i;
+
+const mapReviewersToState = (reviewers: GithubPullRequestReviewerSummary[]) => {
+  const mapping: Record<string, string> = {};
+  reviewers.forEach((reviewer) => {
+    mapping[reviewer.login] = reviewer.state;
+  });
+  return mapping;
+};
+
+export const fetchRecentReviewStatus = async (
+  options: { windowDays?: number; limit?: number } = {},
+): Promise<GithubReviewStatusResult> => {
+  const windowDays = options.windowDays ?? 7;
+  const updatedAfter = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+
+  const base = await fetchRepositoryPullRequests({
+    state: "open",
+    limit: options.limit ?? 50,
+    updatedAfter,
+  });
+
+  return {
+    repository: base.repository,
+    fetchedAt: base.fetchedAt,
+    windowStart: updatedAfter.toISOString(),
+    count: base.count,
+    pullRequests: base.pullRequests.map((pullRequest) => ({
+      number: pullRequest.number,
+      title: pullRequest.title,
+      titleIncludesWip: WIP_REGEX.test(pullRequest.title),
+      draft: pullRequest.draft,
+      author: pullRequest.author,
+      reviewers: mapReviewersToState(pullRequest.reviewers),
+      updatedAt: pullRequest.updatedAt,
+    })),
   };
 };
