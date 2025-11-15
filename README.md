@@ -67,10 +67,10 @@ After configuring env vars you can inspect Linear data via subcommands:
 
 Once `GITHUB_TOKEN` and repository env vars are in place you can inspect pull requests directly from GitHub:
 
-| Command                               | Description                                                                                | Useful flags                                                                                                                                                       |
-| ------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `bun run index.ts github prs`         | Lists pull requests for the configured repository, including reviewer assignments/statuses and labels | `--state open|closed|all`, `--limit <N>` (default 20, max 200), `--created-after/--created-before <ISO>`, `--updated-after/--updated-before <ISO>`, `--format csv` |
-| `bun run index.ts github review-status` | Highlights open PRs updated within the last 7 days, focusing on reviewer states + labels            | `--limit <N>` (default 50), `--format csv`, `--output [path]`, `--all-fields`                                                                                      |
+| Command                                 | Description                                                                                           | Useful flags                                                                  |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run index.ts github prs`           | Lists pull requests for the configured repository, including reviewer assignments/statuses and labels | `--state open                                                                 | closed | all`, `--limit <N>`(default 20, max 200),`--created-after/--created-before <ISO>`, `--updated-after/--updated-before <ISO>`, `--format csv` |
+| `bun run index.ts github review-status` | Highlights open PRs updated within the last 7 days, focusing on reviewer states + labels              | `--limit <N>` (default 50), `--format csv`, `--output [path]`, `--all-fields` |
 
 ### `github prs` details
 

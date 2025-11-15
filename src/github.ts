@@ -367,6 +367,20 @@ const extractLabelNames = (labels: RestPullRequest["labels"]): string[] => {
     .filter((value): value is string => Boolean(value));
 };
 
+export const buildReviewStatusEntries = (
+  pullRequests: GithubPullRequestSummary[],
+): GithubReviewStatusEntry[] =>
+  pullRequests.map((pullRequest) => ({
+    number: pullRequest.number,
+    title: pullRequest.title,
+    titleIncludesWip: WIP_REGEX.test(pullRequest.title),
+    draft: pullRequest.draft,
+    author: pullRequest.author,
+    reviewers: mapReviewersToState(pullRequest.reviewers),
+    updatedAt: pullRequest.updatedAt,
+    labels: pullRequest.labels,
+  }));
+
 export const fetchRecentReviewStatus = async (
   options: { windowDays?: number; limit?: number } = {},
 ): Promise<GithubReviewStatusResult> => {
@@ -384,15 +398,6 @@ export const fetchRecentReviewStatus = async (
     fetchedAt: base.fetchedAt,
     windowStart: updatedAfter.toISOString(),
     count: base.count,
-    pullRequests: base.pullRequests.map((pullRequest) => ({
-      number: pullRequest.number,
-      title: pullRequest.title,
-      titleIncludesWip: WIP_REGEX.test(pullRequest.title),
-      draft: pullRequest.draft,
-      author: pullRequest.author,
-      reviewers: mapReviewersToState(pullRequest.reviewers),
-      updatedAt: pullRequest.updatedAt,
-      labels: pullRequest.labels,
-    })),
+    pullRequests: buildReviewStatusEntries(base.pullRequests),
   };
 };
