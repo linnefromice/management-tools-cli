@@ -69,8 +69,8 @@ Once `GITHUB_TOKEN` and repository env vars are in place you can inspect pull re
 
 | Command                               | Description                                                                                | Useful flags                                                                                                                                                       |
 | ------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `bun run index.ts github prs`         | Lists pull requests for the configured repository, including reviewer assignments/statuses | `--state open|closed|all`, `--limit <N>` (default 20, max 200), `--created-after/--created-before <ISO>`, `--updated-after/--updated-before <ISO>`, `--format csv` |
-| `bun run index.ts github review-status` | Highlights open PRs updated within the last 7 days, focusing on reviewer states            | `--limit <N>` (default 50), `--format csv`, `--output [path]`, `--all-fields`                                                                                      |
+| `bun run index.ts github prs`         | Lists pull requests for the configured repository, including reviewer assignments/statuses and labels | `--state open|closed|all`, `--limit <N>` (default 20, max 200), `--created-after/--created-before <ISO>`, `--updated-after/--updated-before <ISO>`, `--format csv` |
+| `bun run index.ts github review-status` | Highlights open PRs updated within the last 7 days, focusing on reviewer states + labels            | `--limit <N>` (default 50), `--format csv`, `--output [path]`, `--all-fields`                                                                                      |
 
 Examples:
 
@@ -88,7 +88,7 @@ bun run index.ts github review-status
 
 Each entry includes the reviewer roster with their most recent review state plus an aggregate `reviewSummary` (`approved`, `pending`, `changes_requested`, etc.).
 
-`github review-status` outputs only the essentials for triage—`number`, `title`, `titleIncludesWip`, `draft`, `author`, `updatedAt`, and a `{ [login]: state }` reviewer map—so you can scan who’s blocking each PR without extra noise. It automatically filters to open PRs touched within the last 7 days.
+`github review-status` outputs only the essentials for triage—`number`, `title`, `titleIncludesWip`, `draft`, `author`, `updatedAt`, `labels`, and a `{ [login]: state }` reviewer map—so you can scan who’s blocking each PR without extra noise. It automatically filters to open PRs touched within the last 7 days.
 
 ### Output formats
 

@@ -104,6 +104,7 @@ export const ANALYTICS_PULL_REQUEST_FIELDS = [
   "headRef",
   "baseRef",
   "url",
+  "labels",
   "reviewSummary",
   "reviewers",
 ] as const;
@@ -115,6 +116,7 @@ export const ANALYTICS_REVIEW_STATUS_FIELDS = [
   "draft",
   "author",
   "updatedAt",
+  "labels",
   "reviewers",
 ] as const;
 

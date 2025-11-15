@@ -43,6 +43,7 @@ export type GithubPullRequestSummary = {
   mergedAt?: string;
   headRef: string;
   baseRef: string;
+  labels: string[];
   reviewers: GithubPullRequestReviewerSummary[];
   reviewSummary: {
     approved: number;
@@ -70,6 +71,7 @@ export type GithubReviewStatusEntry = {
   author?: string;
   reviewers: Record<string, string>;
   updatedAt: string;
+  labels: string[];
 };
 
 export type GithubReviewStatusResult = {
@@ -295,6 +297,7 @@ const enrichPullRequest = async (
     mergedAt: pullRequest.merged_at ?? undefined,
     headRef: pullRequest.head?.ref ?? "",
     baseRef: pullRequest.base?.ref ?? "",
+    labels: extractLabelNames(pullRequest.labels),
     reviewers,
     reviewSummary: buildReviewSummary(reviewers),
   };
@@ -353,6 +356,17 @@ const mapReviewersToState = (reviewers: GithubPullRequestReviewerSummary[]) => {
   return mapping;
 };
 
+const extractLabelNames = (labels: RestPullRequest["labels"]): string[] => {
+  if (!Array.isArray(labels)) return [];
+  return labels
+    .map((label) => {
+      if (!label) return undefined;
+      if (typeof label === "string") return label;
+      return label.name ?? undefined;
+    })
+    .filter((value): value is string => Boolean(value));
+};
+
 export const fetchRecentReviewStatus = async (
   options: { windowDays?: number; limit?: number } = {},
 ): Promise<GithubReviewStatusResult> => {
@@ -378,6 +392,7 @@ export const fetchRecentReviewStatus = async (
       author: pullRequest.author,
       reviewers: mapReviewersToState(pullRequest.reviewers),
       updatedAt: pullRequest.updatedAt,
+      labels: pullRequest.labels,
     })),
   };
 };
