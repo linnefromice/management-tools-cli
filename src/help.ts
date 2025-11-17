@@ -12,7 +12,8 @@ export const getUsageText = () => `Usage:
   cli-name linear sync
   cli-name figma capture --ids-file <PATH> [--format png|jpg] [--scale 1-4] [--output <PATH>]
   cli-name github prs [--state open|closed|all] [--limit <N>] [--format csv] [--output <PATH>] [--all-fields] [--created-after <ISO>] [--created-before <ISO>] [--updated-after <ISO>] [--updated-before <ISO>]
-  cli-name github review-status [--limit <N>] [--format csv] [--output <PATH>] [--all-fields]`;
+  cli-name github review-status [--limit <N>] [--format csv] [--output <PATH>] [--all-fields]
+  cli-name github commits --user <LOGIN> [--days <N>] [--limit <N>] [--owner <OWNER> --repo <NAME>] [--exclude-merges] [--format csv] [--output <PATH>] [--all-fields]`;
 
 export const getLinearUsageText = () => `Linear commands:
   cli-name linear projects [--full] [--format csv] [--remote] [--output <PATH>] [--all-fields]
@@ -71,6 +72,7 @@ Setup:
 export const getGithubUsageText = () => `GitHub commands:
   cli-name github prs [options]
   cli-name github review-status [options]
+  cli-name github commits [options]
 
 github prs options:
   --state <open|closed|all>   Filter by PR state (default: open)
@@ -88,6 +90,18 @@ github review-status options:
   --limit <N>                 Maximum number of PRs (default: 50, max: 200)
   --format <json|csv>         Output format (default: json)
   --output <path>             Optional file destination; defaults to storage/exports/github-review-status-<timestamp>.<ext>
+  --all-fields                Skip analytics-friendly field filtering
+
+github commits options:
+  Fetch commits authored by a specific user within the most recent N days (default 7).
+  --user <login>              REQUIRED. GitHub login to filter commits.
+  --days <N>                  Lookback window in days (default: 7).
+  --owner <owner> --repo <repo>
+                              Override the repository resolved from environment variables. Both flags are required when overriding.
+  --limit <N>                 Maximum number of commits (default: 40, max: 200)
+  --exclude-merges            Skip merge commits (parent count > 1) when listing results.
+  --format <json|csv>         Output format (default: json)
+  --output <path>             Optional file destination; defaults to storage/exports/github-commits-<timestamp>.<ext>
   --all-fields                Skip analytics-friendly field filtering
 
 Environment:

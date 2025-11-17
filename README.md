@@ -65,12 +65,13 @@ After configuring env vars you can inspect Linear data via subcommands:
 
 ## GitHub commands
 
-Once `GITHUB_TOKEN` and repository env vars are in place you can inspect pull requests directly from GitHub:
+Once `GITHUB_TOKEN` and repository env vars are in place you can inspect pull requests and commits directly from GitHub:
 
-| Command                                 | Description                                                                                           | Useful flags                                                                  |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bun run index.ts github prs`           | Lists pull requests for the configured repository, including reviewer assignments/statuses and labels | `--state open                                                                 | closed | all`, `--limit <N>`(default 20, max 200),`--created-after/--created-before <ISO>`, `--updated-after/--updated-before <ISO>`, `--format csv` |
-| `bun run index.ts github review-status` | Highlights open PRs updated within the last 7 days, focusing on reviewer states + labels              | `--limit <N>` (default 50), `--format csv`, `--output [path]`, `--all-fields` |
+| Command                                           | Description                                                                                           | Useful flags                                                                                                                                                                                      |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run index.ts github prs`                     | Lists pull requests for the configured repository, including reviewer assignments/statuses and labels | `--state open\|closed\|all`, `--limit <N>` (default 20, max 200), `--created-after/--created-before <ISO>`, `--updated-after/--updated-before <ISO>`                                             |
+| `bun run index.ts github review-status`           | Highlights open PRs updated within the last 7 days, focusing on reviewer states + labels              | `--limit <N>` (default 50), `--format csv`, `--output [path]`, `--all-fields`                                                                                                                     |
+| `bun run index.ts github commits --user <login>`  | Fetches commits authored by the specified user within the recent N-day window (default 7 days)        | `--user <login>` (required), `--days <N>` (default 7), `--limit <N>` (default 40, max 200), `--owner <org> --repo <name>` (override env), `--exclude-merges`, `--format csv`, `--output [path]` |
 
 ### `github prs` details
 
@@ -154,11 +155,57 @@ bun run index.ts github prs --state closed --created-after 2024-10-01T00:00:00Z 
 
 # See which open PRs still need reviews (updated in the past week)
 bun run index.ts github review-status
+
+# See last week's commits authored by @alice-dev
+bun run index.ts github commits --user alice-dev
+
+# Capture the last 3 days of commits from @reviewer into CSV
+bun run index.ts github commits --user reviewer --days 3 --limit 100 --format csv \
+  --output ./outputs/github/reviewer-commits.csv
+
+# Query commits from a different repo/org and drop merges
+bun run index.ts github commits --user alice-dev --owner acme --repo infra \
+  --exclude-merges --limit 50
 ```
 
 Each entry includes the reviewer roster with their most recent review state plus an aggregate `reviewSummary` (`approved`, `pending`, `changes_requested`, etc.).
 
 `github review-status` outputs only the essentials for triage—`number`, `title`, `titleIncludesWip`, `draft`, `author`, `updatedAt`, `labels`, and a `{ [login]: state }` reviewer map—so you can scan who’s blocking each PR without extra noise. It automatically filters to open PRs touched within the last 7 days.
+
+### `github commits` details
+
+This command wraps `GET /repos/{owner}/{repo}/commits` with an `author` filter. By default it looks back 7 days (configurable via `--days`) and caps the response to the requested limit. Pass `--owner <org> --repo <name>` to override the repository derived from `GITHUB_OWNER/GITHUB_REPO`, and add `--exclude-merges` to skip merge commits (parent count > 1). Every entry includes commit metadata suitable for standups or audit trails:
+
+- `sha`, `shortMessage`, full `message`
+- `url`, `verified`, parent SHAs
+- `authorLogin`, `authorName`, `authorEmail`, `authorAvatarUrl`
+- `committedAt`
+
+Example output:
+
+```json
+{
+  "repository": "acme/mobile-app",
+  "author": "alice-dev",
+  "fetchedAt": "2025-01-11T09:15:00.000Z",
+  "since": "2025-01-04T09:15:00.000Z",
+  "until": "2025-01-11T09:15:00.000Z",
+  "count": 2,
+  "commits": [
+    {
+      "sha": "abc1234",
+      "shortMessage": "Fix crash on login",
+      "message": "Fix crash on login\\n\\nThe regression...",
+      "url": "https://github.com/acme/mobile-app/commit/abc1234",
+      "authorLogin": "alice-dev",
+      "authorName": "Alice Dev",
+      "committedAt": "2025-01-10T18:42:11Z",
+      "parents": ["def5678"],
+      "verified": true
+    }
+  ]
+}
+```
 
 ### Output formats
 
