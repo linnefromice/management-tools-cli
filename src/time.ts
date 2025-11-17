@@ -1,6 +1,4 @@
-type IntlDateTimeFormatPart = ReturnType<
-  Intl.DateTimeFormat["formatToParts"]
->[number];
+type IntlDateTimeFormatPart = ReturnType<Intl.DateTimeFormat["formatToParts"]>[number];
 
 export type TimeZoneSpec =
   | { type: "iana"; identifier: string }
@@ -14,15 +12,12 @@ export type LocalDateTimeInput = {
   minute: number;
 };
 
-const SYSTEM_TIME_ZONE =
-  Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+const SYSTEM_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
 
 const pad = (value: number, width = 2) => value.toString().padStart(width, "0");
 
 const ensureValidDate = (value: LocalDateTimeInput) => {
-  const date = new Date(
-    Date.UTC(value.year, value.month - 1, value.day, value.hour, value.minute),
-  );
+  const date = new Date(Date.UTC(value.year, value.month - 1, value.day, value.hour, value.minute));
   if (
     date.getUTCFullYear() !== value.year ||
     date.getUTCMonth() !== value.month - 1 ||
@@ -38,9 +33,7 @@ export const parseLocalDateTimeInput = (value: string): LocalDateTimeInput => {
   const digits = value.replace(/\D/g, "");
 
   if (digits.length !== 8 && digits.length !== 12) {
-    throw new Error(
-      "Invalid --window-boundary. Use YYYYMMDD or YYYYMMDDHHMM (digits only).",
-    );
+    throw new Error("Invalid --window-boundary. Use YYYYMMDD or YYYYMMDDHHMM (digits only).");
   }
 
   const year = Number(digits.slice(0, 4));
@@ -88,9 +81,7 @@ const describeOffset = (minutes: number) => {
   return `UTC${sign}${pad(hours)}:${pad(mins)}`;
 };
 
-export const resolveTimeZone = (
-  value?: string,
-): { spec: TimeZoneSpec; label: string } => {
+export const resolveTimeZone = (value?: string): { spec: TimeZoneSpec; label: string } => {
   if (!value || value.toLowerCase() === "local") {
     return { spec: { type: "iana", identifier: SYSTEM_TIME_ZONE }, label: SYSTEM_TIME_ZONE };
   }
@@ -119,10 +110,7 @@ export const resolveTimeZone = (
   }
 };
 
-const extractParts = (
-  formatter: Intl.DateTimeFormat,
-  date: Date,
-): LocalDateTimeInput => {
+const extractParts = (formatter: Intl.DateTimeFormat, date: Date): LocalDateTimeInput => {
   const parts = formatter.formatToParts(date);
   const lookup = new Map<string, IntlDateTimeFormatPart["value"]>();
 
@@ -138,11 +126,7 @@ const extractParts = (
   const hour = Number(lookup.get("hour"));
   const minute = Number(lookup.get("minute"));
 
-  if (
-    [year, month, day, hour, minute].some(
-      (component) => !Number.isFinite(component),
-    )
-  ) {
+  if ([year, month, day, hour, minute].some((component) => !Number.isFinite(component))) {
     throw new Error("Failed to extract timezone-adjusted date parts.");
   }
 
@@ -168,30 +152,15 @@ const getFormatter = (timeZone: string) => {
   return formatter;
 };
 
-const resolveForIanaZone = (
-  value: LocalDateTimeInput,
-  timeZone: string,
-): Date => {
-  const targetMs = Date.UTC(
-    value.year,
-    value.month - 1,
-    value.day,
-    value.hour,
-    value.minute,
-  );
+const resolveForIanaZone = (value: LocalDateTimeInput, timeZone: string): Date => {
+  const targetMs = Date.UTC(value.year, value.month - 1, value.day, value.hour, value.minute);
   let guess = targetMs;
   const formatter = getFormatter(timeZone);
 
   for (let i = 0; i < 5; i += 1) {
     const guessDate = new Date(guess);
     const parts = extractParts(formatter, guessDate);
-    const renderedMs = Date.UTC(
-      parts.year,
-      parts.month - 1,
-      parts.day,
-      parts.hour,
-      parts.minute,
-    );
+    const renderedMs = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
     const diff = targetMs - renderedMs;
     if (diff === 0) {
       return guessDate;
@@ -199,15 +168,10 @@ const resolveForIanaZone = (
     guess += diff;
   }
 
-  throw new Error(
-    `Failed to resolve --window-boundary for timezone "${timeZone}".`,
-  );
+  throw new Error(`Failed to resolve --window-boundary for timezone "${timeZone}".`);
 };
 
-const resolveForOffset = (
-  value: LocalDateTimeInput,
-  offsetMinutes: number,
-): Date => {
+const resolveForOffset = (value: LocalDateTimeInput, offsetMinutes: number): Date => {
   const sign = offsetMinutes >= 0 ? "+" : "-";
   const absoluteMinutes = Math.abs(offsetMinutes);
   const hours = Math.floor(absoluteMinutes / 60);
@@ -221,10 +185,7 @@ const resolveForOffset = (
   return new Date(timestamp);
 };
 
-export const convertLocalDateTimeToUtc = (
-  value: LocalDateTimeInput,
-  spec: TimeZoneSpec,
-): Date => {
+export const convertLocalDateTimeToUtc = (value: LocalDateTimeInput, spec: TimeZoneSpec): Date => {
   if (spec.type === "offset") {
     return resolveForOffset(value, spec.minutes);
   }

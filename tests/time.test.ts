@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  convertLocalDateTimeToUtc,
-  parseLocalDateTimeInput,
-  resolveTimeZone,
-} from "../src/time";
+import { convertLocalDateTimeToUtc, parseLocalDateTimeInput, resolveTimeZone } from "../src/time";
 
 describe("parseLocalDateTimeInput", () => {
   test("parses YYYYMMDD0000 values", () => {
