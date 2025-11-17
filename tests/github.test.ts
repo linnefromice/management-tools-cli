@@ -217,6 +217,6 @@ describe("filterReadyReviewEntries", () => {
     ];
 
     const filtered = filterReadyReviewEntries(entries);
-    expect(filtered).toEqual([entries[0]]);
+    expect(filtered).toEqual([entries[0]!]);
   });
 });
