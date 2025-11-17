@@ -38,6 +38,7 @@ import {
   fetchRecentReviewStatus,
   fetchRepositoryPullRequests,
   fetchUserCommits,
+  filterReadyReviewEntries,
   type RepositoryConfig,
 } from "./src/github";
 import {
@@ -537,10 +538,19 @@ const runGithubReviewStatus = async (args: string[]) => {
   const format = parseOutputFormat(args);
   const skipAnalyticsFilter = parseAllFieldsFlag(args);
   const outputOption = parseOutputOption(args);
+  const readyOnly = hasFlag(args, "ready-only");
 
   try {
     const limit = parseLimitFlag(args, 50);
-    const payload = await fetchRecentReviewStatus({ limit });
+    let payload = await fetchRecentReviewStatus({ limit });
+    if (readyOnly) {
+      const filteredEntries = filterReadyReviewEntries(payload.pullRequests);
+      payload = {
+        ...payload,
+        count: filteredEntries.length,
+        pullRequests: filteredEntries,
+      };
+    }
     const collectionKey = "reviewStatus";
 
     if (!outputOption.enabled) {

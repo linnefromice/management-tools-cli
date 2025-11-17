@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import type { GithubPullRequestReviewerSummary, GithubPullRequestSummary } from "../src/github";
+import type {
+  GithubPullRequestReviewerSummary,
+  GithubPullRequestSummary,
+  GithubReviewStatusEntry,
+} from "../src/github";
 import { buildReviewStatusEntries, __test__ as githubTestUtils } from "../src/github";
 
 const makeReviewer = (
@@ -172,5 +176,47 @@ describe("mapCommitToSummary", () => {
       committedAt: "2025-01-11T08:30:00Z",
       parents: [],
     });
+  });
+});
+
+describe("filterReadyReviewEntries", () => {
+  const { filterReadyReviewEntries } = githubTestUtils;
+
+  test("removes entries marked as draft or WIP", () => {
+    const entries: GithubReviewStatusEntry[] = [
+      {
+        number: 1,
+        title: "Ready PR",
+        titleIncludesWip: false,
+        draft: false,
+        author: "alice",
+        reviewers: {},
+        updatedAt: "2025-01-10T10:00:00Z",
+        labels: [],
+      },
+      {
+        number: 2,
+        title: "[WIP] Refactor",
+        titleIncludesWip: true,
+        draft: false,
+        author: "bob",
+        reviewers: {},
+        updatedAt: "2025-01-10T12:00:00Z",
+        labels: [],
+      },
+      {
+        number: 3,
+        title: "Draft PR",
+        titleIncludesWip: false,
+        draft: true,
+        author: "casey",
+        reviewers: {},
+        updatedAt: "2025-01-10T14:00:00Z",
+        labels: [],
+      },
+    ];
+
+    const filtered = filterReadyReviewEntries(entries);
+    expect(filtered).toEqual([entries[0]]);
   });
 });
