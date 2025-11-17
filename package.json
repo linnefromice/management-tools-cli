@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "build:bundle": "bun build index.ts --target bun --outfile dist/strophos.js",
-    "build:binary": "bun build index.ts --compile --outfile dist/strophos",
+    "build:binary": "BINARY_NAME=${BINARY_NAME:-mng-tool}; bun build index.ts --compile --outfile dist/$BINARY_NAME",
     "check_all": "bun run lint && bun run format && bun run typecheck && bun run test",
     "check-and-build": "bun run check_all && bun run build:binary && cp .env dist/.env"
   },
