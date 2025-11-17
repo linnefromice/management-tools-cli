@@ -12,6 +12,28 @@ To run:
 bun run index.ts
 ```
 
+## Quickstart
+
+```bash
+# linear
+## Search issues
+bun run index.ts linear sync
+bun run index.ts linear search-issues
+
+# figma
+## capture design data as image file
+bun run index.ts figma capture 8802-46326 --format png --output image
+
+# github review-status
+bun run index.ts github review-status --ready-only
+
+# github commits
+## 1day
+bun run index.ts github commits --user linnefromice --days 1 --window-boundary 202511150000 --timezone Asia/Tokyo
+## week
+bun run index.ts github commits --user linnefromice --days 5 --window-boundary 202511150000 --timezone Asia/Tokyo
+```
+
 ## Environment variables
 
 Bun automatically loads variables from a local `.env` file. Copy `.env.example` to `.env` and set:
@@ -70,7 +92,7 @@ Once `GITHUB_TOKEN` and repository env vars are in place you can inspect pull re
 | Command                                          | Description                                                                                           | Useful flags                                                                                                                                                                                                                                                      |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bun run index.ts github prs`                    | Lists pull requests for the configured repository, including reviewer assignments/statuses and labels | `--state open\|closed\|all`, `--limit <N>` (default 20, max 200), `--created-after/--created-before <ISO>`, `--updated-after/--updated-before <ISO>`                                                                                                              |
-| `bun run index.ts github review-status`          | Highlights open PRs updated within the last 7 days, focusing on reviewer states + labels              | `--limit <N>` (default 50), `--format csv`, `--output [path]`, `--all-fields`                                                                                                                                                                                     |
+| `bun run index.ts github review-status`          | Highlights open PRs updated within the last 7 days, focusing on reviewer states + labels              | `--limit <N>` (default 50), `--ready-only`, `--format csv`, `--output [path]`, `--all-fields`                                                                                                                                                                     |
 | `bun run index.ts github commits --user <login>` | Fetches commits authored by the specified user within the recent N-day window (default 7 days)        | `--user <login>` (required), `--days <N>` (default 7), `--window-boundary <YYYYMMDD[HHMM]>`, `--timezone <IANA\|±HHMM>`, `--limit <N>` (default 40, max 200), `--owner <org> --repo <name>` (override env), `--exclude-merges`, `--format csv`, `--output [path]` |
 
 ### `github prs` details
@@ -174,7 +196,7 @@ bun run index.ts github commits --user alice-dev --days 5 \
 
 Each entry includes the reviewer roster with their most recent review state plus an aggregate `reviewSummary` (`approved`, `pending`, `changes_requested`, etc.).
 
-`github review-status` outputs only the essentials for triage—`number`, `title`, `titleIncludesWip`, `draft`, `author`, `updatedAt`, `labels`, and a `{ [login]: state }` reviewer map—so you can scan who’s blocking each PR without extra noise. It automatically filters to open PRs touched within the last 7 days.
+`github review-status` outputs only the essentials for triage—`number`, `title`, `titleIncludesWip`, `draft`, `author`, `updatedAt`, `labels`, and a `{ [login]: state }` reviewer map—so you can scan who’s blocking each PR without extra noise. It automatically filters to open PRs touched within the last 7 days, and `--ready-only` additionally hides drafts or titles containing “WIP” so you focus on PRs ready for review.
 
 ### `github commits` details
 
