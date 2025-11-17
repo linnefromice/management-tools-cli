@@ -115,6 +115,9 @@ export type GithubCommitListResult = {
   fetchedAt: string;
   since?: string;
   until?: string;
+  windowDays?: number;
+  windowBoundary?: string;
+  timeZone?: string;
   count: number;
   commits: GithubCommitSummary[];
 };

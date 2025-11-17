@@ -71,7 +71,7 @@ Once `GITHUB_TOKEN` and repository env vars are in place you can inspect pull re
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bun run index.ts github prs`                    | Lists pull requests for the configured repository, including reviewer assignments/statuses and labels | `--state open\|closed\|all`, `--limit <N>` (default 20, max 200), `--created-after/--created-before <ISO>`, `--updated-after/--updated-before <ISO>`                                            |
 | `bun run index.ts github review-status`          | Highlights open PRs updated within the last 7 days, focusing on reviewer states + labels              | `--limit <N>` (default 50), `--format csv`, `--output [path]`, `--all-fields`                                                                                                                   |
-| `bun run index.ts github commits --user <login>` | Fetches commits authored by the specified user within the recent N-day window (default 7 days)        | `--user <login>` (required), `--days <N>` (default 7), `--limit <N>` (default 40, max 200), `--owner <org> --repo <name>` (override env), `--exclude-merges`, `--format csv`, `--output [path]` |
+| `bun run index.ts github commits --user <login>` | Fetches commits authored by the specified user within the recent N-day window (default 7 days)        | `--user <login>` (required), `--days <N>` (default 7), `--window-boundary <YYYYMMDD[HHMM]>`, `--timezone <IANA\|±HHMM>`, `--limit <N>` (default 40, max 200), `--owner <org> --repo <name>` (override env), `--exclude-merges`, `--format csv`, `--output [path]` |
 
 ### `github prs` details
 
@@ -166,6 +166,10 @@ bun run index.ts github commits --user reviewer --days 3 --limit 100 --format cs
 # Query commits from a different repo/org and drop merges
 bun run index.ts github commits --user alice-dev --owner acme --repo infra \
   --exclude-merges --limit 50
+
+# Capture a full work week of commits anchored to JST midnight
+bun run index.ts github commits --user alice-dev --days 5 \
+  --window-boundary 202405310000 --timezone Asia/Tokyo
 ```
 
 Each entry includes the reviewer roster with their most recent review state plus an aggregate `reviewSummary` (`approved`, `pending`, `changes_requested`, etc.).
@@ -174,7 +178,7 @@ Each entry includes the reviewer roster with their most recent review state plus
 
 ### `github commits` details
 
-This command wraps `GET /repos/{owner}/{repo}/commits` with an `author` filter. By default it looks back 7 days (configurable via `--days`) and caps the response to the requested limit. Pass `--owner <org> --repo <name>` to override the repository derived from `GITHUB_OWNER/GITHUB_REPO`, and add `--exclude-merges` to skip merge commits (parent count > 1).
+This command wraps `GET /repos/{owner}/{repo}/commits` with an `author` filter. By default it looks back 7 days (configurable via `--days`) and caps the response to the requested limit. Pass `--owner <org> --repo <name>` to override the repository derived from `GITHUB_OWNER/GITHUB_REPO`, and add `--exclude-merges` to skip merge commits (parent count > 1). Use `--window-boundary <YYYYMMDD[HHMM]>` together with `--timezone <IANA\|±HHMM>` to anchor the window to a precise local midnight (e.g., `202405310000` in `Asia/Tokyo`).
 
 Default output keeps each commit lean with just the fields needed for weekly summaries:
 
@@ -185,6 +189,8 @@ Default output keeps each commit lean with just the fields needed for weekly sum
 - `authorLogin`
 - `committedAt`
 - `parents`
+
+When you specify window alignment flags the payload also echoes `windowDays`, `windowBoundary`, and `timeZone` so downstream analysis can reason about the exact slice.
 
 Add `--all-fields` when you need the expanded payload (URL, author profile/ email, verification state, etc.).
 
@@ -199,6 +205,9 @@ Example output:
   "fetchedAt": "2025-01-11T09:15:00.000Z",
   "since": "2025-01-04T09:15:00.000Z",
   "until": "2025-01-11T09:15:00.000Z",
+  "windowDays": 7,
+  "windowBoundary": "2025-01-11T00:00:00.000Z",
+  "timeZone": "Asia/Tokyo",
   "count": 2,
   "commits": [
     {
