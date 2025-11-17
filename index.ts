@@ -38,8 +38,15 @@ import {
   fetchRecentReviewStatus,
   fetchRepositoryPullRequests,
   fetchUserCommits,
+  filterReadyReviewEntries,
   type RepositoryConfig,
 } from "./src/github";
+import {
+  convertLocalDateTimeToUtc,
+  parseLocalDateTimeInput,
+  resolveTimeZone,
+  type TimeZoneSpec,
+} from "./src/time";
 
 const [, , command, ...rawArgs] = process.argv;
 
@@ -103,6 +110,8 @@ const flagsRequiringValue = new Set([
   "--days",
   "--owner",
   "--repo",
+  "--timezone",
+  "--window-boundary",
 ]);
 
 const getPositionalArgs = (args: string[]) => {
@@ -185,6 +194,19 @@ const parseRepositoryOverride = (args: string[]): RepositoryConfig | undefined =
     throw new Error("Both --owner and --repo must be provided together.");
   }
   return { owner, repo };
+};
+
+const parseWindowBoundary = (
+  args: string[],
+  timeZoneSpec: TimeZoneSpec,
+): { raw?: string; boundary?: Date } => {
+  const rawValue = getFlagValue(args, "window-boundary");
+  if (!rawValue) {
+    return {};
+  }
+  const localDateTime = parseLocalDateTimeInput(rawValue);
+  const boundary = convertLocalDateTimeToUtc(localDateTime, timeZoneSpec);
+  return { raw: rawValue, boundary };
 };
 
 const buildDefaultOutputPath = (commandKey: string, format: string) => {
@@ -516,10 +538,19 @@ const runGithubReviewStatus = async (args: string[]) => {
   const format = parseOutputFormat(args);
   const skipAnalyticsFilter = parseAllFieldsFlag(args);
   const outputOption = parseOutputOption(args);
+  const readyOnly = hasFlag(args, "ready-only");
 
   try {
     const limit = parseLimitFlag(args, 50);
-    const payload = await fetchRecentReviewStatus({ limit });
+    let payload = await fetchRecentReviewStatus({ limit });
+    if (readyOnly) {
+      const filteredEntries = filterReadyReviewEntries(payload.pullRequests);
+      payload = {
+        ...payload,
+        count: filteredEntries.length,
+        pullRequests: filteredEntries,
+      };
+    }
     const collectionKey = "reviewStatus";
 
     if (!outputOption.enabled) {
@@ -555,10 +586,12 @@ const runGithubCommits = async (args: string[]) => {
     const windowDays = parsePositiveIntFlag(args, "days", 7);
     const repositoryOverride = parseRepositoryOverride(args);
     const excludeMerges = hasFlag(args, "exclude-merges");
-    const until = new Date();
+    const timezone = resolveTimeZone(getFlagValue(args, "timezone"));
+    const boundary = parseWindowBoundary(args, timezone.spec);
+    const until = boundary.boundary ?? new Date();
     const since = new Date(until.getTime() - windowDays * 24 * 60 * 60 * 1000);
 
-    const payload = await fetchUserCommits({
+    const basePayload = await fetchUserCommits({
       author: user,
       limit,
       since,
@@ -566,6 +599,12 @@ const runGithubCommits = async (args: string[]) => {
       repository: repositoryOverride,
       excludeMerges,
     });
+    const payload = {
+      ...basePayload,
+      windowDays,
+      windowBoundary: boundary.boundary ? boundary.boundary.toISOString() : undefined,
+      timeZone: timezone.label,
+    };
 
     const collectionKey = "commits";
 

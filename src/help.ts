@@ -12,8 +12,8 @@ export const getUsageText = () => `Usage:
   cli-name linear sync
   cli-name figma capture --ids-file <PATH> [--format png|jpg] [--scale 1-4] [--output <PATH>]
   cli-name github prs [--state open|closed|all] [--limit <N>] [--format csv] [--output <PATH>] [--all-fields] [--created-after <ISO>] [--created-before <ISO>] [--updated-after <ISO>] [--updated-before <ISO>]
-  cli-name github review-status [--limit <N>] [--format csv] [--output <PATH>] [--all-fields]
-  cli-name github commits --user <LOGIN> [--days <N>] [--limit <N>] [--owner <OWNER> --repo <NAME>] [--exclude-merges] [--format csv] [--output <PATH>] [--all-fields]`;
+  cli-name github review-status [--limit <N>] [--ready-only] [--format csv] [--output <PATH>] [--all-fields]
+  cli-name github commits --user <LOGIN> [--days <N>] [--window-boundary <YYYYMMDD[HHMM]>] [--timezone <IANA|±HHMM>] [--limit <N>] [--owner <OWNER> --repo <NAME>] [--exclude-merges] [--format csv] [--output <PATH>] [--all-fields]`;
 
 export const getLinearUsageText = () => `Linear commands:
   cli-name linear projects [--full] [--format csv] [--remote] [--output <PATH>] [--all-fields]
@@ -88,6 +88,7 @@ github prs options:
 github review-status options:
   Lists open PRs updated within the last 7 days and highlights reviewer state.
   --limit <N>                 Maximum number of PRs (default: 50, max: 200)
+  --ready-only                Skip pull requests marked as draft or whose title includes "WIP".
   --format <json|csv>         Output format (default: json)
   --output <path>             Optional file destination; defaults to storage/exports/github-review-status-<timestamp>.<ext>
   --all-fields                Skip analytics-friendly field filtering
@@ -96,6 +97,9 @@ github commits options:
   Fetch commits authored by a specific user within the most recent N days (default 7).
   --user <login>              REQUIRED. GitHub login to filter commits.
   --days <N>                  Lookback window in days (default: 7).
+  --window-boundary <YYYYMMDD[HHMM]>
+                              Set the exclusive end of the window using a YYYYMMDD or YYYYMMDDHHMM timestamp (local to the timezone option).
+  --timezone <IANA|±HHMM>     Timezone for interpreting --window-boundary (default: your system timezone). Accepts IANA names (Asia/Tokyo) or numeric offsets (+0900).
   --owner <owner> --repo <repo>
                               Override the repository resolved from environment variables. Both flags are required when overriding.
   --limit <N>                 Maximum number of commits (default: 40, max: 200)

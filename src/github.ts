@@ -115,6 +115,9 @@ export type GithubCommitListResult = {
   fetchedAt: string;
   since?: string;
   until?: string;
+  windowDays?: number;
+  windowBoundary?: string;
+  timeZone?: string;
   count: number;
   commits: GithubCommitSummary[];
 };
@@ -419,6 +422,11 @@ export const buildReviewStatusEntries = (
     labels: pullRequest.labels,
   }));
 
+export const filterReadyReviewEntries = (
+  pullRequests: GithubReviewStatusEntry[],
+): GithubReviewStatusEntry[] =>
+  pullRequests.filter((entry) => !entry.draft && !entry.titleIncludesWip);
+
 export const fetchRecentReviewStatus = async (
   options: { windowDays?: number; limit?: number } = {},
 ): Promise<GithubReviewStatusResult> => {
@@ -523,4 +531,5 @@ export const fetchUserCommits = async (
 
 export const __test__ = {
   mapCommitToSummary,
+  filterReadyReviewEntries,
 };
