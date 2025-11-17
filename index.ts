@@ -34,7 +34,12 @@ import { captureFigmaNodes, parseNodeEntriesFromFile, validateFigmaConfig } from
 import type { FigmaNodeEntry } from "./src/figma/types";
 import { normalizeFormat, printPayload, writePayload } from "./src/output";
 import { logger } from "./src/logger";
-import { fetchRecentReviewStatus, fetchRepositoryPullRequests } from "./src/github";
+import {
+  fetchRecentReviewStatus,
+  fetchRepositoryPullRequests,
+  fetchUserCommits,
+  type RepositoryConfig,
+} from "./src/github";
 
 const [, , command, ...rawArgs] = process.argv;
 
@@ -94,6 +99,10 @@ const flagsRequiringValue = new Set([
   "--created-before",
   "--updated-after",
   "--updated-before",
+  "--user",
+  "--days",
+  "--owner",
+  "--repo",
 ]);
 
 const getPositionalArgs = (args: string[]) => {
@@ -150,6 +159,32 @@ const parseDateFlag = (args: string[], flag: string) => {
     throw new Error(`Invalid ISO timestamp for --${flag}: ${value}`);
   }
   return new Date(timestamp);
+};
+
+const parsePositiveIntFlag = (args: string[], flag: string, defaultValue: number, max?: number) => {
+  const value = getFlagValue(args, flag);
+  if (!value) return defaultValue;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`--${flag} must be a positive integer.`);
+  }
+  if (max !== undefined) {
+    return Math.min(parsed, max);
+  }
+  return parsed;
+};
+
+const parseRepositoryOverride = (args: string[]): RepositoryConfig | undefined => {
+  const owner = getFlagValue(args, "owner");
+  const repo = getFlagValue(args, "repo");
+
+  if (!owner && !repo) {
+    return undefined;
+  }
+  if (!owner || !repo) {
+    throw new Error("Both --owner and --repo must be provided together.");
+  }
+  return { owner, repo };
 };
 
 const buildDefaultOutputPath = (commandKey: string, format: string) => {
@@ -504,6 +539,52 @@ const runGithubReviewStatus = async (args: string[]) => {
   }
 };
 
+const runGithubCommits = async (args: string[]) => {
+  const format = parseOutputFormat(args);
+  const skipAnalyticsFilter = parseAllFieldsFlag(args);
+  const outputOption = parseOutputOption(args);
+
+  try {
+    const user = getFlagValue(args, "user");
+    if (!user) {
+      console.error("Error: --user <github-login> is required.");
+      process.exit(1);
+    }
+
+    const limit = parseLimitFlag(args, 40, 200);
+    const windowDays = parsePositiveIntFlag(args, "days", 7);
+    const repositoryOverride = parseRepositoryOverride(args);
+    const excludeMerges = hasFlag(args, "exclude-merges");
+    const until = new Date();
+    const since = new Date(until.getTime() - windowDays * 24 * 60 * 60 * 1000);
+
+    const payload = await fetchUserCommits({
+      author: user,
+      limit,
+      since,
+      until,
+      repository: repositoryOverride,
+      excludeMerges,
+    });
+
+    const collectionKey = "commits";
+
+    if (!outputOption.enabled) {
+      printPayload(payload, format, { collectionKey, skipAnalyticsFilter });
+    } else {
+      const targetPath = outputOption.path ?? buildDefaultOutputPath("github-commits", format);
+      await writePayload(payload, format, { collectionKey, skipAnalyticsFilter }, targetPath);
+      console.log(`Saved output to ${targetPath}`);
+    }
+  } catch (error) {
+    console.error("Failed to list GitHub commits.");
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+    process.exit(1);
+  }
+};
+
 const runGithub = async (args: string[]) => {
   const [subCommand, ...githubArgs] = args;
 
@@ -519,6 +600,9 @@ const runGithub = async (args: string[]) => {
       break;
     case "review-status":
       await runGithubReviewStatus(githubArgs);
+      break;
+    case "commits":
+      await runGithubCommits(githubArgs);
       break;
     default:
       console.error(`Unknown github subcommand: ${subCommand}`);

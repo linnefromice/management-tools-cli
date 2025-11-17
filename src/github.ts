@@ -8,7 +8,7 @@ const requireEnv = (key: string): string => {
   return value;
 };
 
-type RepositoryConfig = {
+export type RepositoryConfig = {
   owner: string;
   repo: string;
 };
@@ -82,6 +82,43 @@ export type GithubReviewStatusResult = {
   pullRequests: GithubReviewStatusEntry[];
 };
 
+export type CommitQueryOptions = {
+  author: string;
+  limit?: number;
+  since?: Date;
+  until?: Date;
+  repository?: RepositoryConfig;
+  excludeMerges?: boolean;
+};
+
+export type GithubCommitSummary = {
+  owner: string;
+  repo: string;
+  sha: string;
+  shortMessage: string;
+  message: string;
+  url: string;
+  authorLogin?: string;
+  authorName?: string;
+  authorEmail?: string;
+  authorAvatarUrl?: string;
+  committedAt?: string;
+  parents: string[];
+  verified: boolean;
+};
+
+export type GithubCommitListResult = {
+  repository: string;
+  owner: string;
+  repo: string;
+  author: string;
+  fetchedAt: string;
+  since?: string;
+  until?: string;
+  count: number;
+  commits: GithubCommitSummary[];
+};
+
 let octokit: Octokit | null = null;
 
 const getOctokit = () => {
@@ -114,6 +151,7 @@ export const resolveGithubRepository = (): RepositoryConfig => {
 };
 
 type RestPullRequest = Awaited<ReturnType<Octokit["rest"]["pulls"]["list"]>>["data"][number];
+type RestCommit = Awaited<ReturnType<Octokit["rest"]["repos"]["listCommits"]>>["data"][number];
 
 const matchesDateFilters = (
   pullRequest: RestPullRequest,
@@ -400,4 +438,89 @@ export const fetchRecentReviewStatus = async (
     count: base.count,
     pullRequests: buildReviewStatusEntries(base.pullRequests),
   };
+};
+
+const isMergeCommit = (commit: RestCommit) => (commit.parents?.length ?? 0) > 1;
+
+const mapCommitToSummary = (
+  commit: RestCommit,
+  repository: RepositoryConfig,
+): GithubCommitSummary => {
+  const shortMessage = commit.commit.message?.split("\n")[0] ?? "";
+  const committedAt = commit.commit.author?.date ?? commit.commit.committer?.date ?? undefined;
+  const parents = Array.isArray(commit.parents)
+    ? commit.parents.map((parent) => parent?.sha).filter((value): value is string => Boolean(value))
+    : [];
+
+  return {
+    owner: repository.owner,
+    repo: repository.repo,
+    sha: commit.sha,
+    shortMessage,
+    message: commit.commit.message ?? "",
+    url: commit.html_url ?? "",
+    authorLogin: commit.author?.login ?? undefined,
+    authorName: commit.commit.author?.name ?? commit.author?.login ?? undefined,
+    authorEmail: commit.commit.author?.email ?? undefined,
+    authorAvatarUrl: commit.author?.avatar_url ?? undefined,
+    committedAt,
+    parents,
+    verified: Boolean(commit.commit.verification?.verified),
+  };
+};
+
+export const fetchUserCommits = async (
+  options: CommitQueryOptions,
+): Promise<GithubCommitListResult> => {
+  if (!options.author) {
+    throw new Error("Author login is required to fetch commits.");
+  }
+
+  const repository = options.repository ?? resolveGithubRepository();
+  const client = getOctokit();
+  const limit = Math.max(1, Math.min(options.limit ?? 50, 200));
+  const perPage = Math.min(limit, 100);
+  const sinceIso = options.since?.toISOString();
+  const untilIso = options.until?.toISOString();
+  const excludeMerges = Boolean(options.excludeMerges);
+
+  const commits: RestCommit[] = [];
+
+  const iterator = client.paginate.iterator(client.rest.repos.listCommits, {
+    owner: repository.owner,
+    repo: repository.repo,
+    author: options.author,
+    per_page: perPage,
+    since: sinceIso,
+    until: untilIso,
+  });
+
+  outer: for await (const response of iterator) {
+    for (const commit of response.data) {
+      if (excludeMerges && isMergeCommit(commit)) {
+        continue;
+      }
+
+      commits.push(commit);
+      if (commits.length >= limit) {
+        break outer;
+      }
+    }
+  }
+
+  return {
+    repository: `${repository.owner}/${repository.repo}`,
+    owner: repository.owner,
+    repo: repository.repo,
+    author: options.author,
+    fetchedAt: new Date().toISOString(),
+    since: sinceIso,
+    until: untilIso,
+    count: commits.length,
+    commits: commits.map((commit) => mapCommitToSummary(commit, repository)),
+  };
+};
+
+export const __test__ = {
+  mapCommitToSummary,
 };
