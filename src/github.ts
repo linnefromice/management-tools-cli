@@ -520,3 +520,7 @@ export const fetchUserCommits = async (
     commits: commits.map((commit) => mapCommitToSummary(commit, repository)),
   };
 };
+
+export const __test__ = {
+  mapCommitToSummary,
+};
