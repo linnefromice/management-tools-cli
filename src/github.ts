@@ -92,6 +92,8 @@ export type CommitQueryOptions = {
 };
 
 export type GithubCommitSummary = {
+  owner: string;
+  repo: string;
   sha: string;
   shortMessage: string;
   message: string;
@@ -107,6 +109,8 @@ export type GithubCommitSummary = {
 
 export type GithubCommitListResult = {
   repository: string;
+  owner: string;
+  repo: string;
   author: string;
   fetchedAt: string;
   since?: string;
@@ -438,16 +442,19 @@ export const fetchRecentReviewStatus = async (
 
 const isMergeCommit = (commit: RestCommit) => (commit.parents?.length ?? 0) > 1;
 
-const mapCommitToSummary = (commit: RestCommit): GithubCommitSummary => {
+const mapCommitToSummary = (
+  commit: RestCommit,
+  repository: RepositoryConfig,
+): GithubCommitSummary => {
   const shortMessage = commit.commit.message?.split("\n")[0] ?? "";
   const committedAt = commit.commit.author?.date ?? commit.commit.committer?.date ?? undefined;
   const parents = Array.isArray(commit.parents)
-    ? commit.parents
-        .map((parent) => parent?.sha)
-        .filter((value): value is string => Boolean(value))
+    ? commit.parents.map((parent) => parent?.sha).filter((value): value is string => Boolean(value))
     : [];
 
   return {
+    owner: repository.owner,
+    repo: repository.repo,
     sha: commit.sha,
     shortMessage,
     message: commit.commit.message ?? "",
@@ -503,11 +510,13 @@ export const fetchUserCommits = async (
 
   return {
     repository: `${repository.owner}/${repository.repo}`,
+    owner: repository.owner,
+    repo: repository.repo,
     author: options.author,
     fetchedAt: new Date().toISOString(),
     since: sinceIso,
     until: untilIso,
     count: commits.length,
-    commits: commits.map(mapCommitToSummary),
+    commits: commits.map((commit) => mapCommitToSummary(commit, repository)),
   };
 };

@@ -67,11 +67,11 @@ After configuring env vars you can inspect Linear data via subcommands:
 
 Once `GITHUB_TOKEN` and repository env vars are in place you can inspect pull requests and commits directly from GitHub:
 
-| Command                                           | Description                                                                                           | Useful flags                                                                                                                                                                                      |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bun run index.ts github prs`                     | Lists pull requests for the configured repository, including reviewer assignments/statuses and labels | `--state open\|closed\|all`, `--limit <N>` (default 20, max 200), `--created-after/--created-before <ISO>`, `--updated-after/--updated-before <ISO>`                                             |
-| `bun run index.ts github review-status`           | Highlights open PRs updated within the last 7 days, focusing on reviewer states + labels              | `--limit <N>` (default 50), `--format csv`, `--output [path]`, `--all-fields`                                                                                                                     |
-| `bun run index.ts github commits --user <login>`  | Fetches commits authored by the specified user within the recent N-day window (default 7 days)        | `--user <login>` (required), `--days <N>` (default 7), `--limit <N>` (default 40, max 200), `--owner <org> --repo <name>` (override env), `--exclude-merges`, `--format csv`, `--output [path]` |
+| Command                                          | Description                                                                                           | Useful flags                                                                                                                                                                                    |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run index.ts github prs`                    | Lists pull requests for the configured repository, including reviewer assignments/statuses and labels | `--state open\|closed\|all`, `--limit <N>` (default 20, max 200), `--created-after/--created-before <ISO>`, `--updated-after/--updated-before <ISO>`                                            |
+| `bun run index.ts github review-status`          | Highlights open PRs updated within the last 7 days, focusing on reviewer states + labels              | `--limit <N>` (default 50), `--format csv`, `--output [path]`, `--all-fields`                                                                                                                   |
+| `bun run index.ts github commits --user <login>` | Fetches commits authored by the specified user within the recent N-day window (default 7 days)        | `--user <login>` (required), `--days <N>` (default 7), `--limit <N>` (default 40, max 200), `--owner <org> --repo <name>` (override env), `--exclude-merges`, `--format csv`, `--output [path]` |
 
 ### `github prs` details
 
@@ -174,18 +174,27 @@ Each entry includes the reviewer roster with their most recent review state plus
 
 ### `github commits` details
 
-This command wraps `GET /repos/{owner}/{repo}/commits` with an `author` filter. By default it looks back 7 days (configurable via `--days`) and caps the response to the requested limit. Pass `--owner <org> --repo <name>` to override the repository derived from `GITHUB_OWNER/GITHUB_REPO`, and add `--exclude-merges` to skip merge commits (parent count > 1). Every entry includes commit metadata suitable for standups or audit trails:
+This command wraps `GET /repos/{owner}/{repo}/commits` with an `author` filter. By default it looks back 7 days (configurable via `--days`) and caps the response to the requested limit. Pass `--owner <org> --repo <name>` to override the repository derived from `GITHUB_OWNER/GITHUB_REPO`, and add `--exclude-merges` to skip merge commits (parent count > 1).
 
-- `sha`, `shortMessage`, full `message`
-- `url`, `verified`, parent SHAs
-- `authorLogin`, `authorName`, `authorEmail`, `authorAvatarUrl`
+Default output keeps each commit lean with just the fields needed for weekly summaries:
+
+- `owner`
+- `repo`
+- `sha`
+- `message`
+- `authorLogin`
 - `committedAt`
+- `parents`
+
+Add `--all-fields` when you need the expanded payload (URL, author profile/ email, verification state, etc.).
 
 Example output:
 
 ```json
 {
   "repository": "acme/mobile-app",
+  "owner": "acme",
+  "repo": "mobile-app",
   "author": "alice-dev",
   "fetchedAt": "2025-01-11T09:15:00.000Z",
   "since": "2025-01-04T09:15:00.000Z",
@@ -193,19 +202,19 @@ Example output:
   "count": 2,
   "commits": [
     {
+      "owner": "acme",
+      "repo": "mobile-app",
       "sha": "abc1234",
-      "shortMessage": "Fix crash on login",
       "message": "Fix crash on login\\n\\nThe regression...",
-      "url": "https://github.com/acme/mobile-app/commit/abc1234",
       "authorLogin": "alice-dev",
-      "authorName": "Alice Dev",
       "committedAt": "2025-01-10T18:42:11Z",
-      "parents": ["def5678"],
-      "verified": true
+      "parents": ["def5678"]
     }
   ]
 }
 ```
+
+`owner`/`repo` mirror the repository context resolved for the command, ensuring logs remain clear even if you capture multiple repositories.
 
 ### Output formats
 

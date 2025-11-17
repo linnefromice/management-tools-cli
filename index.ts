@@ -572,8 +572,7 @@ const runGithubCommits = async (args: string[]) => {
     if (!outputOption.enabled) {
       printPayload(payload, format, { collectionKey, skipAnalyticsFilter });
     } else {
-      const targetPath =
-        outputOption.path ?? buildDefaultOutputPath("github-commits", format);
+      const targetPath = outputOption.path ?? buildDefaultOutputPath("github-commits", format);
       await writePayload(payload, format, { collectionKey, skipAnalyticsFilter }, targetPath);
       console.log(`Saved output to ${targetPath}`);
     }
