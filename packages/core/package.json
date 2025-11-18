@@ -1,10 +1,26 @@
 {
   "name": "@mng-tool/core",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Shared SDK services for the management-tools CLI",
   "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist",
+    "prepare": "bun run build"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   },
   "dependencies": {
     "@linear/sdk": "^63.2.0",

@@ -14,6 +14,7 @@
     "check-and-build": "bun run --filter management-tools-cli check-and-build"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "typescript": "^5.6.3"
   }
 }
