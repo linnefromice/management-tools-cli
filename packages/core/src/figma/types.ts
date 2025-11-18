@@ -1,3 +1,5 @@
+import type { CoreLogger } from "../types";
+
 export type FigmaImageFormat = "png" | "jpg";
 
 export type FigmaScale = 1 | 2 | 3 | 4;
@@ -66,4 +68,11 @@ export interface FigmaNodeConfig {
 export interface FigmaNodeEntry {
   fileKey: string;
   nodeId: string;
+}
+
+export interface FigmaServiceConfig {
+  accessToken: string;
+  apiBaseUrl?: string;
+  outputDir?: string;
+  logger?: CoreLogger;
 }

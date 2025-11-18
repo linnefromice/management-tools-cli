@@ -1,9 +1,9 @@
 import { test, expect, describe } from "bun:test";
-import { validateFigmaConfig } from "../src/figma";
+import { validateFigmaConfig } from "../packages/core/src/figma";
 
 describe("validateFigmaConfig", () => {
   test("returns validation result", () => {
-    const result = validateFigmaConfig();
+    const result = validateFigmaConfig({ accessToken: "token" });
 
     expect(result).toHaveProperty("valid");
     expect(result).toHaveProperty("errors");
@@ -11,7 +11,7 @@ describe("validateFigmaConfig", () => {
   });
 
   test("includes error messages when config is invalid", () => {
-    const result = validateFigmaConfig();
+    const result = validateFigmaConfig({});
 
     // デフォルト設定では無効な場合、エラーがあるはず
     if (!result.valid) {

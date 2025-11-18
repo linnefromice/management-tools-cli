@@ -3,8 +3,11 @@ import type {
   GithubPullRequestReviewerSummary,
   GithubPullRequestSummary,
   GithubReviewStatusEntry,
-} from "../src/github";
-import { buildReviewStatusEntries, __test__ as githubTestUtils } from "../src/github";
+} from "../packages/core/src/github";
+import {
+  buildReviewStatusEntries,
+  __test__ as githubTestUtils,
+} from "../packages/core/src/github";
 
 const makeReviewer = (
   overrides: Partial<GithubPullRequestReviewerSummary> & { login: string },

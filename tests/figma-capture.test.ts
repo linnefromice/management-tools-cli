@@ -1,21 +1,13 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { captureFigmaNodes, parseNodeEntriesFromFile, validateFigmaConfig } from "../src/figma";
-
-const ORIGINAL_ENV = {
-  FIGMA_ACCESS_TOKEN: process.env.FIGMA_ACCESS_TOKEN,
-};
+import {
+  createFigmaService,
+  parseNodeEntriesFromFile,
+  validateFigmaConfig,
+} from "../packages/core/src/figma";
 
 const ORIGINAL_FETCH = globalThis.fetch;
-
-const resetEnv = () => {
-  if (ORIGINAL_ENV.FIGMA_ACCESS_TOKEN === undefined) {
-    delete process.env.FIGMA_ACCESS_TOKEN;
-  } else {
-    process.env.FIGMA_ACCESS_TOKEN = ORIGINAL_ENV.FIGMA_ACCESS_TOKEN;
-  }
-};
 
 describe("parseNodeEntriesFromFile", () => {
   const tmpFile = path.resolve("tmp/figma-node-ids.txt");
@@ -49,10 +41,9 @@ describe("parseNodeEntriesFromFile", () => {
 
 describe("captureFigmaNodes", () => {
   const outputDir = path.resolve("tmp/figma-output");
+  const figmaService = createFigmaService({ accessToken: "test-token" });
 
   beforeEach(() => {
-    process.env.FIGMA_ACCESS_TOKEN = "test-token";
-
     const imageMap = {
       "123:456": "https://figma.example/image-a.png",
       "789:012": "https://figma.example/image-b.png",
@@ -90,13 +81,12 @@ describe("captureFigmaNodes", () => {
   });
 
   afterEach(async () => {
-    resetEnv();
     globalThis.fetch = ORIGINAL_FETCH;
     await fs.rm(outputDir, { recursive: true, force: true });
   });
 
   test("writes images to disk with default naming", async () => {
-    const results = await captureFigmaNodes({
+    const results = await figmaService.captureNodes({
       nodeEntries: [
         { fileKey: "testFileKey", nodeId: "123:456" },
         { fileKey: "testFileKey", nodeId: "789:012" },
@@ -117,7 +107,7 @@ describe("captureFigmaNodes", () => {
   });
 
   test("validateFigmaConfig only requires FIGMA_ACCESS_TOKEN", () => {
-    const validation = validateFigmaConfig();
+    const validation = validateFigmaConfig({ accessToken: "test-token" });
     expect(validation.valid).toBe(true);
     expect(validation.errors).toHaveLength(0);
   });

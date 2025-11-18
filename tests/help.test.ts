@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { getUsageText, getLinearUsageText } from "../src/help";
+import { getUsageText, getLinearUsageText } from "../packages/cli/src/help";
 
 describe("getUsageText", () => {
   test("lists greet command", () => {

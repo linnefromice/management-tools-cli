@@ -8,7 +8,7 @@ import {
   normalizeFormat,
   renderPayload,
   writePayload,
-} from "../src/output";
+} from "../packages/cli/src/output";
 
 describe("normalizeFormat", () => {
   test("defaults to json", () => {

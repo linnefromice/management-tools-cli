@@ -1,35 +1,19 @@
 {
-  "name": "management-tools-cli",
-  "module": "index.ts",
-  "type": "module",
+  "name": "management-tools-workspace",
   "private": true,
+  "type": "module",
+  "workspaces": ["packages/*"],
   "scripts": {
-    "lint": "eslint . --ext .ts,.tsx",
-    "format": "prettier --write .",
-    "typecheck": "tsc --noEmit",
-    "test": "bun test",
-    "build:bundle": "bun build index.ts --target bun --outfile dist/strophos.js",
-    "build:binary": "BINARY_NAME=${BINARY_NAME:-mng-tool}; bun build index.ts --compile --outfile dist/$BINARY_NAME",
-    "check_all": "bun run lint && bun run format && bun run typecheck && bun run test",
-    "check-and-build": "bun run check_all && bun run build:binary && cp .env dist/.env"
+    "lint": "bun run --filter management-tools-cli lint",
+    "format": "bun run --filter management-tools-cli format",
+    "typecheck": "bun run --filter management-tools-cli typecheck",
+    "test": "bun run --filter management-tools-cli test",
+    "build:bundle": "bun run --filter management-tools-cli build:bundle",
+    "build:binary": "bun run --filter management-tools-cli build:binary",
+    "check_all": "bun run --filter management-tools-cli check_all",
+    "check-and-build": "bun run --filter management-tools-cli check-and-build"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@types/bun": "latest",
-    "@typescript-eslint/eslint-plugin": "^8.46.3",
-    "@typescript-eslint/parser": "^8.46.3",
-    "eslint": "^9.39.1",
-    "eslint-config-prettier": "^10.1.8",
-    "globals": "^16.5.0",
-    "prettier": "^3.6.2"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
-  },
-  "dependencies": {
-    "@linear/sdk": "^63.2.0",
-    "@octokit/rest": "^22.0.1",
-    "chalk": "^5.6.2",
-    "commander": "^14.0.2"
+    "@types/bun": "latest"
   }
 }
