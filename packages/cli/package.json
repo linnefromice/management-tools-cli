@@ -1,0 +1,32 @@
+{
+  "name": "management-tools-cli",
+  "module": "./src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test ../../tests",
+    "build:bundle": "bun build src/index.ts --target bun --outfile ../../dist/strophos.js",
+    "build:binary": "BINARY_NAME=${BINARY_NAME:-mng-tool}; bun build src/index.ts --compile --outfile ../../dist/$BINARY_NAME",
+    "check_all": "bun run lint && bun run format && bun run typecheck && bun run test",
+    "check-and-build": "bun run check_all && bun run build:binary && cp ../../.env ../../dist/.env"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/bun": "latest",
+    "@typescript-eslint/eslint-plugin": "^8.46.3",
+    "@typescript-eslint/parser": "^8.46.3",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.5.0",
+    "prettier": "^3.6.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@mng-tool/core": "workspace:*"
+  }
+}

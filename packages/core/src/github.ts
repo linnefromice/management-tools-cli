@@ -1,11 +1,26 @@
 import { Octokit } from "@octokit/rest";
 
-const requireEnv = (key: string): string => {
-  const value = process.env[key];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${key}`);
-  }
-  return value;
+export type GithubServiceConfig = {
+  token: string;
+  defaultRepository?: RepositoryConfig;
+  client?: Octokit;
+};
+
+type GithubContext = {
+  getOctokit: () => Octokit;
+  defaultRepository?: RepositoryConfig;
+};
+
+const createGithubContext = (config: GithubServiceConfig): GithubContext => {
+  let client = config.client ?? null;
+
+  const getOctokit = () => {
+    if (client) return client;
+    client = new Octokit({ auth: config.token });
+    return client;
+  };
+
+  return { getOctokit, defaultRepository: config.defaultRepository };
 };
 
 export type RepositoryConfig = {
@@ -20,6 +35,7 @@ export type PullRequestQueryOptions = {
   createdBefore?: Date;
   updatedAfter?: Date;
   updatedBefore?: Date;
+  repository?: RepositoryConfig;
 };
 
 export type GithubPullRequestReviewerSummary = {
@@ -122,35 +138,13 @@ export type GithubCommitListResult = {
   commits: GithubCommitSummary[];
 };
 
-let octokit: Octokit | null = null;
-
-const getOctokit = () => {
-  if (!octokit) {
-    octokit = new Octokit({
-      auth: requireEnv("GITHUB_TOKEN"),
-    });
-  }
-  return octokit;
-};
-
-export const resolveGithubRepository = (): RepositoryConfig => {
-  const owner = process.env.GITHUB_OWNER;
-  const repo = process.env.GITHUB_REPO;
-  if (owner && repo) {
-    return { owner, repo };
-  }
-
-  const combined = process.env.GITHUB_REPOSITORY;
-  if (combined && combined.includes("/")) {
-    const [combinedOwner, combinedRepo] = combined.split("/", 2);
-    if (combinedOwner && combinedRepo) {
-      return { owner: combinedOwner, repo: combinedRepo };
-    }
-  }
-
-  throw new Error(
-    "Missing repository configuration. Set GITHUB_OWNER and GITHUB_REPO or a combined GITHUB_REPOSITORY value.",
-  );
+const resolveGithubRepository = (
+  ctx: GithubContext,
+  override?: RepositoryConfig,
+): RepositoryConfig => {
+  if (override) return override;
+  if (ctx.defaultRepository) return ctx.defaultRepository;
+  throw new Error("Missing repository configuration.");
 };
 
 type RestPullRequest = Awaited<ReturnType<Octokit["rest"]["pulls"]["list"]>>["data"][number];
@@ -300,10 +294,11 @@ const buildReviewSummary = (
 };
 
 const enrichPullRequest = async (
+  ctx: GithubContext,
   pullRequest: RestPullRequest,
   repository: RepositoryConfig,
 ): Promise<GithubPullRequestSummary> => {
-  const client = getOctokit();
+  const client = ctx.getOctokit();
 
   const [reviewRequests, reviews] = await Promise.all([
     client.rest.pulls.listRequestedReviewers({
@@ -344,11 +339,12 @@ const enrichPullRequest = async (
   };
 };
 
-export const fetchRepositoryPullRequests = async (
+const fetchRepositoryPullRequestsInternal = async (
+  ctx: GithubContext,
   options: PullRequestQueryOptions = {},
 ): Promise<GithubPullRequestListResult> => {
-  const repository = resolveGithubRepository();
-  const client = getOctokit();
+  const repository = resolveGithubRepository(ctx, options.repository);
+  const client = ctx.getOctokit();
   const limit = Math.max(1, options.limit ?? 20);
   const perPage = Math.min(Math.max(limit, 1), 100);
 
@@ -376,7 +372,7 @@ export const fetchRepositoryPullRequests = async (
   }
 
   const pullRequests = await Promise.all(
-    basePullRequests.map((pullRequest) => enrichPullRequest(pullRequest, repository)),
+    basePullRequests.map((pullRequest) => enrichPullRequest(ctx, pullRequest, repository)),
   );
 
   return {
@@ -427,16 +423,18 @@ export const filterReadyReviewEntries = (
 ): GithubReviewStatusEntry[] =>
   pullRequests.filter((entry) => !entry.draft && !entry.titleIncludesWip);
 
-export const fetchRecentReviewStatus = async (
-  options: { windowDays?: number; limit?: number } = {},
+const fetchRecentReviewStatusInternal = async (
+  ctx: GithubContext,
+  options: { windowDays?: number; limit?: number; repository?: RepositoryConfig } = {},
 ): Promise<GithubReviewStatusResult> => {
   const windowDays = options.windowDays ?? 7;
   const updatedAfter = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
 
-  const base = await fetchRepositoryPullRequests({
+  const base = await fetchRepositoryPullRequestsInternal(ctx, {
     state: "open",
     limit: options.limit ?? 50,
     updatedAfter,
+    repository: options.repository,
   });
 
   return {
@@ -477,15 +475,16 @@ const mapCommitToSummary = (
   };
 };
 
-export const fetchUserCommits = async (
+const fetchUserCommitsInternal = async (
+  ctx: GithubContext,
   options: CommitQueryOptions,
 ): Promise<GithubCommitListResult> => {
   if (!options.author) {
     throw new Error("Author login is required to fetch commits.");
   }
 
-  const repository = options.repository ?? resolveGithubRepository();
-  const client = getOctokit();
+  const repository = resolveGithubRepository(ctx, options.repository);
+  const client = ctx.getOctokit();
   const limit = Math.max(1, Math.min(options.limit ?? 50, 200));
   const perPage = Math.min(limit, 100);
   const sinceIso = options.since?.toISOString();
@@ -526,6 +525,28 @@ export const fetchUserCommits = async (
     until: untilIso,
     count: commits.length,
     commits: commits.map((commit) => mapCommitToSummary(commit, repository)),
+  };
+};
+
+export type GithubService = {
+  fetchRepositoryPullRequests: (
+    options?: PullRequestQueryOptions,
+  ) => Promise<GithubPullRequestListResult>;
+  fetchRecentReviewStatus: (options?: {
+    windowDays?: number;
+    limit?: number;
+    repository?: RepositoryConfig;
+  }) => Promise<GithubReviewStatusResult>;
+  fetchUserCommits: (options: CommitQueryOptions) => Promise<GithubCommitListResult>;
+};
+
+export const createGithubService = (config: GithubServiceConfig): GithubService => {
+  const ctx = createGithubContext(config);
+  return {
+    fetchRepositoryPullRequests: (options) =>
+      fetchRepositoryPullRequestsInternal(ctx, options),
+    fetchRecentReviewStatus: (options) => fetchRecentReviewStatusInternal(ctx, options),
+    fetchUserCommits: (options) => fetchUserCommitsInternal(ctx, options),
   };
 };
 

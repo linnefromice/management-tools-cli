@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@mng-tool/core": ["../core/src/index.ts"],
+      "@mng-tool/core/*": ["../core/src/*"]
+    }
+  },
+  "include": ["src"]
+}

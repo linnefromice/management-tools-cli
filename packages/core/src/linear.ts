@@ -3,56 +3,51 @@ import { LinearClient, Project, Team } from "@linear/sdk";
 
 const PAGE_SIZE = 50;
 
-const requireEnv = (key: string): string => {
-  const value = process.env[key];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${key}`);
-  }
-  return value;
+export type LinearServiceConfig = {
+  apiKey: string;
+  workspaceId?: string;
+  client?: LinearClient;
 };
 
-let linearClient: LinearClient | null = null;
-let linearClientOverride: LinearClient | null = null;
-
-const getLinearClient = () => {
-  if (linearClientOverride) {
-    return linearClientOverride;
-  }
-
-  if (!linearClient) {
-    linearClient = new LinearClient({
-      apiKey: requireEnv("LINEAR_API_KEY"),
-    });
-  }
-  return linearClient;
+type LinearContext = {
+  getLinearClient: () => LinearClient;
+  ensureWorkspaceAccess: () => Promise<{ linear: LinearClient; organizationId: string }>;
 };
 
-const getWorkspaceId = () => requireEnv("LINEAR_WORKSPACE_ID");
+const createLinearContext = (config: LinearServiceConfig): LinearContext => {
+  let linearClient = config.client ?? null;
+  let validatedWorkspaceId: string | null = null;
 
-let validatedWorkspaceId: string | null = null;
+  const getLinearClient = () => {
+    if (linearClient) {
+      return linearClient;
+    }
+    linearClient = new LinearClient({ apiKey: config.apiKey });
+    return linearClient;
+  };
 
-const ensureWorkspaceAccess = async () => {
-  const linear = getLinearClient();
-  if (validatedWorkspaceId) {
-    return { linear, organizationId: validatedWorkspaceId };
-  }
+  const ensureWorkspaceAccess = async () => {
+    const linear = getLinearClient();
+    if (validatedWorkspaceId) {
+      return { linear, organizationId: validatedWorkspaceId };
+    }
 
-  const expectedWorkspace = getWorkspaceId();
-  const viewer = await linear.viewer;
-  const organization = await viewer.organization;
-  const organizationId = organization.id;
+    const viewer = await linear.viewer;
+    const organization = await viewer.organization;
+    const organizationId = organization.id;
 
-  if (expectedWorkspace && organizationId !== expectedWorkspace) {
-    throw new Error(
-      `Authenticated workspace (${organizationId}) does not match expected workspace (${expectedWorkspace}).`,
-    );
-  }
+    if (config.workspaceId && organizationId !== config.workspaceId) {
+      throw new Error(
+        `Authenticated workspace (${organizationId}) does not match expected workspace (${config.workspaceId}).`,
+      );
+    }
 
-  validatedWorkspaceId = organizationId;
-  return { linear, organizationId };
+    validatedWorkspaceId = organizationId;
+    return { linear, organizationId };
+  };
+
+  return { getLinearClient, ensureWorkspaceAccess };
 };
-
-export const LINEAR_WORKSPACE_ID = process.env.LINEAR_WORKSPACE_ID ?? "(not set)";
 
 export type LinearProjectSummary = {
   id: string;
@@ -186,11 +181,12 @@ const paginateConnection = async <T>(
   return items;
 };
 
-export const fetchWorkspaceProjects = async (
+const fetchWorkspaceProjectsInternal = async (
+  ctx: LinearContext,
   options: FetchWorkspaceProjectsOptions = {},
 ): Promise<LinearProjectSummary[] | LinearProjectFull[]> => {
   const { full = false } = options;
-  const { linear } = await ensureWorkspaceAccess();
+  const { linear } = await ctx.ensureWorkspaceAccess();
 
   const results: Array<LinearProjectSummary | LinearProjectFull> = [];
   let cursor: string | null | undefined;
@@ -217,64 +213,44 @@ export const fetchWorkspaceProjects = async (
   return results;
 };
 
-const fetchIssuesPlain = async (): Promise<LinearIssueFull[]> => {
-  const { linear } = await ensureWorkspaceAccess();
+const fetchIssuesPlain = async (ctx: LinearContext): Promise<LinearIssueFull[]> => {
+  const { linear } = await ctx.ensureWorkspaceAccess();
   const nodes = await paginateConnection((cursor) =>
     linear.issues({ first: PAGE_SIZE, after: cursor ?? undefined, includeArchived: false }),
   );
   return nodes.map(normalizeIssueRecord);
 };
 
-const fetchUsersPlain = async (): Promise<LinearUserFull[]> => {
-  const { linear } = await ensureWorkspaceAccess();
+const fetchUsersPlain = async (ctx: LinearContext): Promise<LinearUserFull[]> => {
+  const { linear } = await ctx.ensureWorkspaceAccess();
   const nodes = await paginateConnection((cursor) =>
     linear.users({ first: PAGE_SIZE, after: cursor ?? undefined }),
   );
   return nodes.map(entityToPlainObject);
 };
 
-const fetchLabelsPlain = async (): Promise<LinearLabelFull[]> => {
-  const { linear } = await ensureWorkspaceAccess();
+const fetchLabelsPlain = async (ctx: LinearContext): Promise<LinearLabelFull[]> => {
+  const { linear } = await ctx.ensureWorkspaceAccess();
   const nodes = await paginateConnection((cursor) =>
     linear.issueLabels({ first: PAGE_SIZE, after: cursor ?? undefined, includeArchived: false }),
   );
   return nodes.map(entityToPlainObject);
 };
 
-const fetchCyclesPlain = async (): Promise<LinearCycleFull[]> => {
-  const { linear } = await ensureWorkspaceAccess();
+const fetchCyclesPlain = async (ctx: LinearContext): Promise<LinearCycleFull[]> => {
+  const { linear } = await ctx.ensureWorkspaceAccess();
   const nodes = await paginateConnection((cursor) =>
     linear.cycles({ first: PAGE_SIZE, after: cursor ?? undefined }),
   );
   return nodes.map(entityToPlainObject);
 };
 
-export const fetchLinearMasterData = async (): Promise<LinearMasterData> => {
-  const [teams, projects, issues, users, labels, cycles] = await Promise.all([
-    fetchWorkspaceTeams({ full: true }) as Promise<LinearTeamFull[]>,
-    fetchWorkspaceProjects({ full: true }) as Promise<LinearProjectFull[]>,
-    fetchIssuesPlain(),
-    fetchUsersPlain(),
-    fetchLabelsPlain(),
-    fetchCyclesPlain(),
-  ]);
-
-  return {
-    fetchedAt: new Date().toISOString(),
-    teams,
-    projects,
-    issues,
-    users,
-    labels,
-    cycles,
-  };
-};
-
-export const fetchWorkspaceTeams = async (
+const fetchWorkspaceTeamsInternal = async (
+  ctx: LinearContext,
   options: FetchWorkspaceTeamsOptions = {},
 ): Promise<LinearTeamSummary[] | LinearTeamFull[]> => {
   const { full = false } = options;
-  const { linear } = await ensureWorkspaceAccess();
+  const { linear } = await ctx.ensureWorkspaceAccess();
 
   const results: Array<LinearTeamSummary | LinearTeamFull> = [];
   let cursor: string | null | undefined;
@@ -301,20 +277,50 @@ export const fetchWorkspaceTeams = async (
   return results;
 };
 
-export const fetchWorkspaceIssues = async (): Promise<LinearIssueFull[]> => fetchIssuesPlain();
+const fetchLinearMasterDataInternal = async (ctx: LinearContext): Promise<LinearMasterData> => {
+  const [teams, projects, issues, users, labels, cycles] = await Promise.all([
+    fetchWorkspaceTeamsInternal(ctx, { full: true }) as Promise<LinearTeamFull[]>,
+    fetchWorkspaceProjectsInternal(ctx, { full: true }) as Promise<LinearProjectFull[]>,
+    fetchIssuesPlain(ctx),
+    fetchUsersPlain(ctx),
+    fetchLabelsPlain(ctx),
+    fetchCyclesPlain(ctx),
+  ]);
 
-export const fetchWorkspaceUsers = async (): Promise<LinearUserFull[]> => fetchUsersPlain();
-
-export const fetchWorkspaceLabels = async (): Promise<LinearLabelFull[]> => fetchLabelsPlain();
-
-export const fetchWorkspaceCycles = async (): Promise<LinearCycleFull[]> => fetchCyclesPlain();
-
-export const setLinearClientForTesting = (client: LinearClient | null) => {
-  linearClientOverride = client;
-  linearClient = null;
-  validatedWorkspaceId = null;
+  return {
+    fetchedAt: new Date().toISOString(),
+    teams,
+    projects,
+    issues,
+    users,
+    labels,
+    cycles,
+  };
 };
 
-export const resetLinearClientForTesting = () => {
-  setLinearClientForTesting(null);
+export type LinearService = {
+  fetchWorkspaceProjects: (
+    options?: FetchWorkspaceProjectsOptions,
+  ) => Promise<LinearProjectSummary[] | LinearProjectFull[]>;
+  fetchWorkspaceTeams: (
+    options?: FetchWorkspaceTeamsOptions,
+  ) => Promise<LinearTeamSummary[] | LinearTeamFull[]>;
+  fetchWorkspaceIssues: () => Promise<LinearIssueFull[]>;
+  fetchWorkspaceUsers: () => Promise<LinearUserFull[]>;
+  fetchWorkspaceLabels: () => Promise<LinearLabelFull[]>;
+  fetchWorkspaceCycles: () => Promise<LinearCycleFull[]>;
+  fetchLinearMasterData: () => Promise<LinearMasterData>;
+};
+
+export const createLinearService = (config: LinearServiceConfig): LinearService => {
+  const ctx = createLinearContext(config);
+  return {
+    fetchWorkspaceProjects: (options) => fetchWorkspaceProjectsInternal(ctx, options),
+    fetchWorkspaceTeams: (options) => fetchWorkspaceTeamsInternal(ctx, options),
+    fetchWorkspaceIssues: () => fetchIssuesPlain(ctx),
+    fetchWorkspaceUsers: () => fetchUsersPlain(ctx),
+    fetchWorkspaceLabels: () => fetchLabelsPlain(ctx),
+    fetchWorkspaceCycles: () => fetchCyclesPlain(ctx),
+    fetchLinearMasterData: () => fetchLinearMasterDataInternal(ctx),
+  };
 };

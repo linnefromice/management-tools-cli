@@ -3,18 +3,28 @@ import path from "node:path";
 import type {
   FigmaCaptureOptions,
   FigmaCaptureResult,
+  FigmaConfigCheck,
   FigmaNodeConfig,
   FigmaNodeEntry,
+  FigmaServiceConfig,
 } from "./types";
 import {
   DEFAULT_FIGMA_IMAGE_FORMAT,
   DEFAULT_FIGMA_SCALE,
-  FIGMA_OUTPUT_DIR,
+  normalizeFigmaConfig,
+  resolveFigmaOutputDir,
   validateFigmaConfig,
 } from "./config";
-import { fetchFigmaImages, downloadImageBuffer } from "./api";
+import { downloadImageBuffer, fetchFigmaImages, type FigmaApiContext } from "./api";
 import { parseNodeId, parseNodeEntryFromUrl, validateNodeId } from "./url-parser";
-import { logger } from "../logger";
+
+const logMessage = (
+  ctx: FigmaApiContext,
+  level: "debug" | "info" | "warn" | "error",
+  message: string,
+) => {
+  ctx.logger?.[level](message);
+};
 
 const ensureOutputDirectory = async (dir: string) => {
   await fs.mkdir(dir, { recursive: true });
@@ -37,14 +47,18 @@ const buildOutputPath = (
   return path.join(executionDir, filename);
 };
 
-export const captureFigmaNodes = async ({
-  nodeEntries,
-  format = DEFAULT_FIGMA_IMAGE_FORMAT,
-  scale = DEFAULT_FIGMA_SCALE,
-  outputPath,
-  outputDir = FIGMA_OUTPUT_DIR,
-}: FigmaCaptureOptions): Promise<FigmaCaptureResult[]> => {
-  logger.info("Starting Figma capture process");
+const captureFigmaNodesInternal = async (
+  ctx: FigmaApiContext,
+  defaultOutputDir: string,
+  {
+    nodeEntries,
+    format = DEFAULT_FIGMA_IMAGE_FORMAT,
+    scale = DEFAULT_FIGMA_SCALE,
+    outputPath,
+    outputDir,
+  }: FigmaCaptureOptions,
+): Promise<FigmaCaptureResult[]> => {
+  logMessage(ctx, "info", "Starting Figma capture process");
 
   if (!nodeEntries || nodeEntries.length === 0) {
     throw new Error("No node entries provided.");
@@ -52,11 +66,12 @@ export const captureFigmaNodes = async ({
 
   const entries = nodeEntries;
 
-  // Deduplicate by fileKey:nodeId combination
   const uniqueEntries = Array.from(
     new Map(entries.map((entry) => [`${entry.fileKey}:${entry.nodeId}`, entry])).values(),
   );
-  logger.debug(
+  logMessage(
+    ctx,
+    "debug",
     `Unique node entries (${uniqueEntries.length}): ${uniqueEntries.map((e) => `${e.fileKey}/${e.nodeId}`).join(", ")}`,
   );
 
@@ -70,7 +85,6 @@ export const captureFigmaNodes = async ({
     }
   });
 
-  // Group entries by fileKey for batched API calls
   const entriesByFileKey = new Map<string, FigmaNodeEntry[]>();
   for (const entry of uniqueEntries) {
     const existing = entriesByFileKey.get(entry.fileKey) || [];
@@ -78,15 +92,16 @@ export const captureFigmaNodes = async ({
     entriesByFileKey.set(entry.fileKey, existing);
   }
 
-  logger.info(
+  logMessage(
+    ctx,
+    "info",
     `Fetching image URLs for ${uniqueEntries.length} node(s) across ${entriesByFileKey.size} file(s) (format: ${format}, scale: ${scale})`,
   );
 
-  // Fetch images for each fileKey
   const imagesByNodeId = new Map<string, { imageUrl: string; fileKey: string }>();
   for (const [currentFileKey, currentEntries] of entriesByFileKey.entries()) {
-    logger.debug(`Fetching ${currentEntries.length} node(s) for file key: ${currentFileKey}`);
-    const images = await fetchFigmaImages({
+    logMessage(ctx, "debug", `Fetching ${currentEntries.length} node(s) for file key: ${currentFileKey}`);
+    const images = await fetchFigmaImages(ctx, {
       nodeIds: currentEntries.map((e) => e.nodeId),
       fileKey: currentFileKey,
       format,
@@ -96,7 +111,7 @@ export const captureFigmaNodes = async ({
     for (const entry of currentEntries) {
       const imageUrl = images[entry.nodeId];
       if (!imageUrl) {
-        logger.error(`No image URL returned for node ${entry.nodeId}`);
+        logMessage(ctx, "error", `No image URL returned for node ${entry.nodeId}`);
         throw new Error(`Figma did not return an image URL for node ${entry.nodeId}`);
       }
       imagesByNodeId.set(entry.nodeId, { imageUrl, fileKey: currentFileKey });
@@ -105,6 +120,7 @@ export const captureFigmaNodes = async ({
 
   const timestamp = formatTimestamp();
   const results: FigmaCaptureResult[] = [];
+  const resolvedOutputDir = outputDir ? resolveFigmaOutputDir(outputDir) : defaultOutputDir;
 
   for (const entry of uniqueEntries) {
     const imageData = imagesByNodeId.get(entry.nodeId);
@@ -112,22 +128,25 @@ export const captureFigmaNodes = async ({
       throw new Error(`Missing image data for node ${entry.nodeId}`);
     }
 
-    logger.debug(`Processing node ${entry.nodeId} from file ${entry.fileKey}`);
-    const buffer = await downloadImageBuffer(imageData.imageUrl);
+    logMessage(ctx, "debug", `Processing node ${entry.nodeId} from file ${entry.fileKey}`);
+    const buffer = await downloadImageBuffer(ctx, imageData.imageUrl);
 
     const targetPath =
       outputPath && uniqueEntries.length === 1
         ? path.resolve(process.cwd(), outputPath)
-        : buildOutputPath(outputDir, entry.fileKey, entry.nodeId, format, timestamp);
+        : buildOutputPath(resolvedOutputDir, entry.fileKey, entry.nodeId, format, timestamp);
 
-    // ディレクトリが存在しない場合は作成
     const targetDir = path.dirname(targetPath);
-    logger.debug(`Ensuring output directory exists: ${targetDir}`);
+    logMessage(ctx, "debug", `Ensuring output directory exists: ${targetDir}`);
     await ensureOutputDirectory(targetDir);
 
-    logger.info(`Writing file: ${targetPath}`);
+    logMessage(ctx, "info", `Writing file: ${targetPath}`);
     await fs.writeFile(targetPath, buffer);
-    logger.info(`Saved ${entry.nodeId} (${(buffer.length / 1024).toFixed(2)} KB) to ${targetPath}`);
+    logMessage(
+      ctx,
+      "info",
+      `Saved ${entry.nodeId} (${(buffer.length / 1024).toFixed(2)} KB) to ${targetPath}`,
+    );
 
     results.push({
       nodeId: entry.nodeId,
@@ -140,7 +159,7 @@ export const captureFigmaNodes = async ({
     });
   }
 
-  logger.info(`Capture completed: ${results.length} file(s) saved`);
+  logMessage(ctx, "info", `Capture completed: ${results.length} file(s) saved`);
   return results;
 };
 
@@ -230,12 +249,10 @@ export const parseNodeEntriesFromFile = async (filePath: string): Promise<FigmaN
   const ext = path.extname(resolved).toLowerCase();
 
   if (ext === ".json") {
-    logger.debug(`Parsing JSON configuration from ${resolved}`);
     return parseNodeEntriesFromJson(resolved);
   }
 
   if (ext === ".txt" || !ext) {
-    logger.debug(`Parsing TXT configuration from ${resolved}`);
     return parseNodeEntriesFromTxt(resolved);
   }
 
@@ -251,3 +268,27 @@ export const parseNodeIdsFromFile = async (filePath: string) => {
 };
 
 export { parseNodeId, validateNodeId, validateFigmaConfig };
+
+export type { FigmaServiceConfig, FigmaCaptureOptions, FigmaCaptureResult, FigmaNodeEntry } from "./types";
+
+export type FigmaService = {
+  captureNodes: (options: FigmaCaptureOptions) => Promise<FigmaCaptureResult[]>;
+  parseNodeEntriesFromFile: (filePath: string) => Promise<FigmaNodeEntry[]>;
+  validateConfig: () => FigmaConfigCheck;
+};
+
+export const createFigmaService = (config: FigmaServiceConfig): FigmaService => {
+  const normalized = normalizeFigmaConfig(config);
+  const ctx: FigmaApiContext = {
+    accessToken: normalized.accessToken,
+    apiBaseUrl: normalized.apiBaseUrl,
+    logger: normalized.logger,
+  };
+  const defaultOutputDir = normalized.outputDir ?? resolveFigmaOutputDir();
+
+  return {
+    captureNodes: (options) => captureFigmaNodesInternal(ctx, defaultOutputDir, options),
+    parseNodeEntriesFromFile,
+    validateConfig: () => validateFigmaConfig(config),
+  };
+};

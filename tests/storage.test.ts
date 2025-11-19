@@ -2,10 +2,11 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { LinearIssueFull } from "../src/linear";
-import { findStoredIssueByKey, searchStoredIssues, writeLinearDataset } from "../src/storage";
+import { createLinearStorage, type LinearStorage } from "../packages/core/src/storage";
+import type { LinearIssueFull } from "../packages/core/src/linear";
 
 let tempDir: string;
+let storage: LinearStorage;
 
 const issues: LinearIssueFull[] = [
   {
@@ -28,15 +29,15 @@ const issues: LinearIssueFull[] = [
 
 beforeEach(async () => {
   tempDir = await mkdtemp(path.join(tmpdir(), "linear-storage-"));
-  process.env.LINEAR_STORAGE_DIR = tempDir;
+  storage = createLinearStorage({ rootDir: tempDir });
 
-  await writeLinearDataset("issues", {
+  await storage.writeLinearDataset("issues", {
     fetchedAt: new Date().toISOString(),
     count: issues.length,
     items: issues,
   });
 
-  await writeLinearDataset("teams", {
+  await storage.writeLinearDataset("teams", {
     fetchedAt: new Date().toISOString(),
     count: 2,
     items: [
@@ -48,36 +49,35 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await rm(tempDir, { recursive: true, force: true });
-  delete process.env.LINEAR_STORAGE_DIR;
 });
 
 describe("searchStoredIssues", () => {
   test("returns all issues when no filters provided", async () => {
-    const result = await searchStoredIssues({});
+    const result = await storage.searchStoredIssues({});
     expect(result.count).toBe(2);
     expect(result.issues.map((i) => i.id)).toEqual(["issue-1", "issue-2"]);
   });
 
   test("filters by project", async () => {
-    const result = await searchStoredIssues({ projectId: "project-beta" });
+    const result = await storage.searchStoredIssues({ projectId: "project-beta" });
     expect(result.count).toBe(1);
     expect(result.issues[0]?.id).toBe("issue-2");
   });
 
   test("filters by label", async () => {
-    const result = await searchStoredIssues({ labelId: "label-bug" });
+    const result = await storage.searchStoredIssues({ labelId: "label-bug" });
     expect(result.count).toBe(1);
     expect(result.issues[0]?.id).toBe("issue-1");
   });
 
   test("filters by cycle", async () => {
-    const result = await searchStoredIssues({ cycleId: "cycle-2" });
+    const result = await storage.searchStoredIssues({ cycleId: "cycle-2" });
     expect(result.count).toBe(1);
     expect(result.issues[0]?.id).toBe("issue-2");
   });
 
   test("falls back to nested relation ids when normalized fields are missing", async () => {
-    await writeLinearDataset("issues", {
+    await storage.writeLinearDataset("issues", {
       fetchedAt: new Date().toISOString(),
       count: 1,
       items: [
@@ -90,7 +90,7 @@ describe("searchStoredIssues", () => {
       ],
     });
 
-    const result = await searchStoredIssues({
+    const result = await storage.searchStoredIssues({
       projectId: "project-nested",
       cycleId: "cycle-nested",
     });
@@ -102,12 +102,12 @@ describe("searchStoredIssues", () => {
 
 describe("findStoredIssueByKey", () => {
   test("returns issue when team key and number match", async () => {
-    const result = await findStoredIssueByKey("CORE-1");
+    const result = await storage.findStoredIssueByKey("CORE-1");
     expect(result.issue?.id).toBe("issue-1");
   });
 
   test("returns null when no match", async () => {
-    const result = await findStoredIssueByKey("CORE-999");
+    const result = await storage.findStoredIssueByKey("CORE-999");
     expect(result.issue).toBeNull();
   });
 });

@@ -2,7 +2,7 @@ import { test, expect, describe, beforeAll, afterAll } from "bun:test";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { parseNodeEntriesFromFile } from "../src/figma";
+import { parseNodeEntriesFromFile } from "../packages/core/src/figma";
 
 describe("parseNodeEntriesFromFile", () => {
   let tmpDir: string;

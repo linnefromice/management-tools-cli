@@ -27,6 +27,7 @@ storage/
 outputs/**/*
 !outputs/**/
 !outputs/**/.gitkeep
+tmp/
 
 # caches
 .eslintcache

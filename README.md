@@ -1,16 +1,67 @@
 # management-tools-cli
 
-To install dependencies:
+CLI + SDK workspace for day-to-day Linear / GitHub / Figma workflows.
+
+_日本語版 README は [README.ja.md](./README.ja.md) を参照してください。_
+
+- `packages/core`: provider-agnostic services + shared types for embedding in other tools.
+- `packages/cli`: terminal UX that wires the services to commands, output helpers, and storage.
+
+## Installation
 
 ```bash
 bun install
 ```
 
-To run:
+This installs dependencies for every workspace package.
+
+## Running the CLI
+
+All commands are still routed through the repo root entry point, so previous scripts continue to work:
 
 ```bash
-bun run index.ts
+bun run index.ts --help
+bun run index.ts linear projects --remote
 ```
+
+You can also target the CLI package scripts directly:
+
+```bash
+# run tests / lint / typecheck scoped to the CLI package
+bun run --filter management-tools-cli test
+bun run --filter management-tools-cli typecheck
+
+# build standalone binary into dist/mng-tool
+bun run --filter management-tools-cli build:binary
+```
+
+The compiled binary bundles Bun, so you can distribute `dist/mng-tool` without requiring Bun on the target host.
+
+## Project structure
+
+```
+packages/
+  core/   # SDK-style modules for Linear, GitHub, Figma, storage, time helpers, etc.
+  cli/    # Commander-style CLI using the core packages
+dist/     # Bundled JS + standalone binary (after build)
+storage/  # Local Linear cache (populated at runtime)
+tests/    # Shared Bun test suite covering both packages
+```
+
+Use `@mng-tool/core` when building another CLI/SDK. Example:
+
+```ts
+import { createLinearService } from "@mng-tool/core";
+
+const linear = createLinearService({
+  apiKey: process.env.LINEAR_API_KEY!,
+  workspaceId: process.env.LINEAR_WORKSPACE_ID,
+});
+
+const projects = await linear.fetchWorkspaceProjects();
+```
+
+The CLI consumes the same packages via `packages/cli/src/index.ts`, so new provider capabilities should start in `packages/core` and then be exposed via commands.
 
 ## Quickstart
 
@@ -67,7 +118,21 @@ GITHUB_REPO=your-repo
 
 `GITHUB_TOKEN` needs `repo` scope (and `read:org` if you fetch from private org repos). The CLI resolves the repository from either the split owner/repo variables or the combined `GITHUB_REPOSITORY`.
 
-## Linear commands
+### Building + releasing binaries
+
+Run the workspace script to build and test before releasing:
+
+```bash
+bun run --filter management-tools-cli check-and-build
+```
+
+This executes lint/format/typecheck/tests, compiles `dist/mng-tool`, and copies `.env` for the runtime.
+
+GitHub tags that follow `v*` trigger `.github/workflows/release-binary.yml`, which performs the same Linux build in CI and uploads `dist/mng-tool-linux` to the release artifacts.
+
+## CLI commands
+
+### Linear
 
 After configuring env vars you can inspect Linear data via subcommands:
 
@@ -85,7 +150,7 @@ After configuring env vars you can inspect Linear data via subcommands:
 
 > ヒント: `--remote` を付けると対象データを Linear API から再取得し、ローカルの `storage/linear/*.json` も自動更新します。指定しない場合は最新のローカルキャッシュを読み込みます。
 
-## GitHub commands
+### GitHub
 
 Once `GITHUB_TOKEN` and repository env vars are in place you can inspect pull requests and commits directly from GitHub:
 
@@ -95,7 +160,7 @@ Once `GITHUB_TOKEN` and repository env vars are in place you can inspect pull re
 | `bun run index.ts github review-status`          | Highlights open PRs updated within the last 7 days, focusing on reviewer states + labels              | `--limit <N>` (default 50), `--ready-only`, `--format csv`, `--output [path]`, `--all-fields`                                                                                                                                                                     |
 | `bun run index.ts github commits --user <login>` | Fetches commits authored by the specified user within the recent N-day window (default 7 days)        | `--user <login>` (required), `--days <N>` (default 7), `--window-boundary <YYYYMMDD[HHMM]>`, `--timezone <IANA\|±HHMM>`, `--limit <N>` (default 40, max 200), `--owner <org> --repo <name>` (override env), `--exclude-merges`, `--format csv`, `--output [path]` |
 
-### `github prs` details
+#### `github prs` details
 
 This command mirrors the GitHub PR list endpoint and enriches each entry with:
 
@@ -138,7 +203,7 @@ Example:
 
 Use `--state`/`--limit`/`--created-after`/`--updated-after` to focus on specific slices, then pipe the structured JSON or CSV downstream.
 
-### `github review-status` details
+#### `github review-status` details
 
 This reporter is optimized for daily standups. It automatically:
 

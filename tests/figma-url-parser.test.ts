@@ -4,7 +4,7 @@ import {
   validateNodeId,
   parseFileKeyFromUrl,
   parseNodeEntryFromUrl,
-} from "../src/figma/url-parser";
+} from "../packages/core/src/figma/url-parser";
 
 describe("parseNodeId", () => {
   test("parses node ID from full Figma URL", () => {

@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { parseArgs, resolveGreetingFromArgs, selectGreeting } from "../src/greet";
+import {
+  parseArgs,
+  resolveGreetingFromArgs,
+  selectGreeting,
+} from "../packages/cli/src/greet";
 
 describe("parseArgs", () => {
   test("captures long-form flags", () => {

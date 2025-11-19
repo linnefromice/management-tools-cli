@@ -1,16 +1,6 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type { LinearClient } from "@linear/sdk";
-import {
-  fetchWorkspaceProjects,
-  fetchWorkspaceTeams,
-  fetchWorkspaceIssues,
-  fetchWorkspaceUsers,
-  fetchWorkspaceLabels,
-  fetchWorkspaceCycles,
-  fetchLinearMasterData,
-  setLinearClientForTesting,
-  resetLinearClientForTesting,
-} from "../src/linear";
+import { createLinearService } from "../packages/core/src/linear";
 
 const WORKSPACE_ID = "workspace-test";
 const connection = <T>(nodes: T[]) => ({
@@ -71,20 +61,17 @@ const makeMockLinearClient = (data: MockData): LinearClient => {
   return mock as unknown as LinearClient;
 };
 
-beforeEach(() => {
-  process.env.LINEAR_API_KEY = "test-key";
-  process.env.LINEAR_WORKSPACE_ID = WORKSPACE_ID;
-});
-
-afterEach(() => {
-  resetLinearClientForTesting();
-});
+const buildService = (data: MockData = defaultData) =>
+  createLinearService({
+    apiKey: "test-key",
+    workspaceId: WORKSPACE_ID,
+    client: makeMockLinearClient(data),
+  });
 
 describe("fetchWorkspaceProjects", () => {
   test("returns summaries with team ids", async () => {
-    setLinearClientForTesting(makeMockLinearClient(defaultData));
-
-    const projects = await fetchWorkspaceProjects();
+    const service = buildService();
+    const projects = await service.fetchWorkspaceProjects();
 
     expect(projects).toEqual([
       {
@@ -99,9 +86,8 @@ describe("fetchWorkspaceProjects", () => {
   });
 
   test("returns full objects when requested", async () => {
-    setLinearClientForTesting(makeMockLinearClient(defaultData));
-
-    const projects = await fetchWorkspaceProjects({ full: true });
+    const service = buildService();
+    const projects = await service.fetchWorkspaceProjects({ full: true });
 
     expect(projects).toHaveLength(1);
     expect((projects[0] as Record<string, unknown>).id).toBe("proj-1");
@@ -110,21 +96,20 @@ describe("fetchWorkspaceProjects", () => {
 
 describe("fetchWorkspace* helpers", () => {
   test("return datasets from the client", async () => {
-    setLinearClientForTesting(makeMockLinearClient(defaultData));
+    const service = buildService();
 
-    await expect(fetchWorkspaceTeams()).resolves.toHaveLength(1);
-    await expect(fetchWorkspaceIssues()).resolves.toHaveLength(1);
-    await expect(fetchWorkspaceUsers()).resolves.toHaveLength(1);
-    await expect(fetchWorkspaceLabels()).resolves.toHaveLength(1);
-    await expect(fetchWorkspaceCycles()).resolves.toHaveLength(1);
+    await expect(service.fetchWorkspaceTeams()).resolves.toHaveLength(1);
+    await expect(service.fetchWorkspaceIssues()).resolves.toHaveLength(1);
+    await expect(service.fetchWorkspaceUsers()).resolves.toHaveLength(1);
+    await expect(service.fetchWorkspaceLabels()).resolves.toHaveLength(1);
+    await expect(service.fetchWorkspaceCycles()).resolves.toHaveLength(1);
   });
 });
 
 describe("fetchLinearMasterData", () => {
   test("aggregates all master datasets", async () => {
-    setLinearClientForTesting(makeMockLinearClient(defaultData));
-
-    const master = await fetchLinearMasterData();
+    const service = buildService();
+    const master = await service.fetchLinearMasterData();
 
     expect(master.teams).toHaveLength(1);
     expect(master.projects).toHaveLength(1);
