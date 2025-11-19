@@ -6,6 +6,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "emitDeclarationOnly": false,
+    "allowImportingTsExtensions": false,
     "outDir": "./dist"
   },
   "include": ["src"]
