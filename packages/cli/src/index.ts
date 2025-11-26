@@ -164,6 +164,7 @@ const flagsRequiringValue = new Set([
   "--repo",
   "--timezone",
   "--window-boundary",
+  "--name",
 ]);
 
 const getPositionalArgs = (args: string[]) => {
@@ -312,7 +313,7 @@ const getDataset = async <T>(
   return { fetchedAt: dataset.fetchedAt, items: dataset.items, source: "local" };
 };
 
-const runLinearProjects = async (wantsFull: boolean, remote: boolean, withIssueCount: boolean) => {
+const runLinearProjects = async (wantsFull: boolean, remote: boolean, withIssueCount: boolean, nameFilter?: string) => {
   const linearService = requireLinearService();
   const dataset = await getDataset<LinearProjectSummary | LinearProjectFull>(
     "projects",
@@ -324,6 +325,14 @@ const runLinearProjects = async (wantsFull: boolean, remote: boolean, withIssueC
   );
 
   let projects = dataset.items;
+
+  if (nameFilter) {
+    const lowerFilter = nameFilter.toLowerCase();
+    projects = projects.filter((project) => {
+      const name = (project as { name: string }).name;
+      return name.toLowerCase().includes(lowerFilter);
+    });
+  }
 
   if (withIssueCount) {
     const storage = requireLinearStorage();
@@ -521,6 +530,7 @@ const runLinear = async (args: string[]) => {
   const useRemote = parseRemoteFlag(linearArgs);
   const skipAnalyticsFilter = parseAllFieldsFlag(linearArgs);
   const withIssueCount = hasFlag(linearArgs, "with-issue-count");
+  const nameFilter = getFlagValue(linearArgs, "name");
   const positionalArgs = getPositionalArgs(linearArgs);
   const outputOption = parseOutputOption(linearArgs);
 
@@ -530,7 +540,7 @@ const runLinear = async (args: string[]) => {
 
     switch (subCommand) {
       case "projects":
-        payload = await runLinearProjects(wantsFull, useRemote, withIssueCount);
+        payload = await runLinearProjects(wantsFull, useRemote, withIssueCount, nameFilter);
         collectionKey = "projects";
         break;
       case "teams":
