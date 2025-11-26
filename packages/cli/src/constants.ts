@@ -41,6 +41,7 @@ export const ANALYTICS_PROJECT_FIELDS = [
   "color",
   "progress",
   "url",
+  "issueCount",
 ] as const;
 
 export const ANALYTICS_TEAM_FIELDS = [

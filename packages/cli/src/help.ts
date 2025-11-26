@@ -1,7 +1,7 @@
 export const getUsageText = () => `Usage:
   cli-name help
   cli-name greet --hour <HH> --name <YourName>
-  cli-name linear projects [--full] [--format csv] [--remote] [--output <PATH>] [--all-fields]
+  cli-name linear projects [--full] [--format csv] [--remote] [--with-issue-count] [--output <PATH>] [--all-fields]
   cli-name linear teams [--full] [--format csv] [--remote] [--output <PATH>] [--all-fields]
   cli-name linear issue <KEY> [--format csv] [--output <PATH>] [--all-fields]
   cli-name linear issues [--format csv] [--remote] [--output <PATH>] [--all-fields]
@@ -16,7 +16,8 @@ export const getUsageText = () => `Usage:
   cli-name github commits --user <LOGIN> [--days <N>] [--window-boundary <YYYYMMDD[HHMM]>] [--timezone <IANA|±HHMM>] [--limit <N>] [--owner <OWNER> --repo <NAME>] [--exclude-merges] [--format csv] [--output <PATH>] [--all-fields]`;
 
 export const getLinearUsageText = () => `Linear commands:
-  cli-name linear projects [--full] [--format csv] [--remote] [--output <PATH>] [--all-fields]
+  cli-name linear projects [--full] [--format csv] [--remote] [--with-issue-count] [--output <PATH>] [--all-fields]
+    --with-issue-count: Include issue count for each project (requires local issues dataset)
   cli-name linear teams [--full] [--format csv] [--remote] [--output <PATH>] [--all-fields]
   cli-name linear issue <KEY> [--format csv] [--output <PATH>] [--all-fields]
   cli-name linear issues [--format csv] [--remote] [--output <PATH>] [--all-fields]
