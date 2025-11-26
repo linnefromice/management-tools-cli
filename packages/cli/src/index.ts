@@ -164,6 +164,7 @@ const flagsRequiringValue = new Set([
   "--repo",
   "--timezone",
   "--window-boundary",
+  "--name",
 ]);
 
 const getPositionalArgs = (args: string[]) => {
@@ -312,7 +313,7 @@ const getDataset = async <T>(
   return { fetchedAt: dataset.fetchedAt, items: dataset.items, source: "local" };
 };
 
-const runLinearProjects = async (wantsFull: boolean, remote: boolean) => {
+const runLinearProjects = async (wantsFull: boolean, remote: boolean, withIssueCount: boolean, nameFilter?: string) => {
   const linearService = requireLinearService();
   const dataset = await getDataset<LinearProjectSummary | LinearProjectFull>(
     "projects",
@@ -323,13 +324,49 @@ const runLinearProjects = async (wantsFull: boolean, remote: boolean) => {
       >,
   );
 
+  let projects = dataset.items;
+
+  if (nameFilter) {
+    const lowerFilter = nameFilter.toLowerCase();
+    projects = projects.filter((project) => {
+      const name = (project as { name: string }).name;
+      return name.toLowerCase().includes(lowerFilter);
+    });
+  }
+
+  if (withIssueCount) {
+    const storage = requireLinearStorage();
+    let issuesData: LinearIssueFull[];
+    try {
+      const issuesDataset = await storage.readLinearDataset<LinearIssueFull>("issues");
+      issuesData = issuesDataset.items;
+    } catch {
+      throw new Error(
+        'Could not load issues dataset. Run "linear sync" first or re-run with --remote to fetch issues.',
+      );
+    }
+
+    const issueCountByProject = new Map<string, number>();
+    for (const issue of issuesData) {
+      const projectId = (issue as { projectId?: string | null }).projectId;
+      if (projectId) {
+        issueCountByProject.set(projectId, (issueCountByProject.get(projectId) ?? 0) + 1);
+      }
+    }
+
+    projects = projects.map((project) => ({
+      ...project,
+      issueCount: issueCountByProject.get((project as { id: string }).id) ?? 0,
+    }));
+  }
+
   return {
     workspaceId: LINEAR_WORKSPACE_ID,
     fetchedAt: dataset.fetchedAt,
     source: dataset.source,
     full: remote ? wantsFull : undefined,
-    count: dataset.items.length,
-    projects: dataset.items,
+    count: projects.length,
+    projects,
   };
 };
 
@@ -492,6 +529,8 @@ const runLinear = async (args: string[]) => {
   const wantsFull = linearArgs.includes("--full");
   const useRemote = parseRemoteFlag(linearArgs);
   const skipAnalyticsFilter = parseAllFieldsFlag(linearArgs);
+  const withIssueCount = hasFlag(linearArgs, "with-issue-count");
+  const nameFilter = getFlagValue(linearArgs, "name");
   const positionalArgs = getPositionalArgs(linearArgs);
   const outputOption = parseOutputOption(linearArgs);
 
@@ -501,7 +540,7 @@ const runLinear = async (args: string[]) => {
 
     switch (subCommand) {
       case "projects":
-        payload = await runLinearProjects(wantsFull, useRemote);
+        payload = await runLinearProjects(wantsFull, useRemote, withIssueCount, nameFilter);
         collectionKey = "projects";
         break;
       case "teams":
