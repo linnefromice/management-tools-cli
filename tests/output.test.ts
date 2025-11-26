@@ -149,4 +149,57 @@ describe("analytics field filtering", () => {
     expect(rendered.startsWith("id,identifier,title")).toBe(true);
     expect(rendered.includes("issue-raw")).toBe(true);
   });
+
+  test("filters projects payload to include id and issueCount", () => {
+    const payload = {
+      projects: [
+        {
+          id: "proj-123",
+          name: "Test Project",
+          state: "started",
+          description: "A test project",
+          issueCount: 42,
+          internalField: "should-be-filtered",
+        },
+      ],
+    };
+
+    const rendered = renderPayload(payload, "json", { collectionKey: "projects" });
+    const parsed = JSON.parse(rendered) as { projects: Array<Record<string, unknown>> };
+
+    expect(parsed.projects[0]).toMatchObject({
+      id: "proj-123",
+      name: "Test Project",
+      state: "started",
+      description: "A test project",
+      issueCount: 42,
+    });
+    expect(parsed.projects[0].internalField).toBeUndefined();
+  });
+
+  test("filters projects csv to include id and issueCount headers", () => {
+    const payload = {
+      projects: [
+        {
+          id: "proj-456",
+          name: "CSV Project",
+          state: "backlog",
+          issueCount: 10,
+          internalField: "filtered",
+        },
+      ],
+    };
+
+    const rendered = renderPayload(payload, "csv", { collectionKey: "projects" });
+    const [headerLine = ""] = rendered.split("\n");
+
+    expect(headerLine).toContain("id");
+    expect(headerLine).toContain("name");
+    expect(headerLine).toContain("state");
+    expect(headerLine).toContain("issueCount");
+    expect(headerLine).not.toContain("internalField");
+    expect(rendered).toContain("proj-456");
+    expect(rendered).toContain("CSV Project");
+    expect(rendered).toContain("10");
+  });
 });
